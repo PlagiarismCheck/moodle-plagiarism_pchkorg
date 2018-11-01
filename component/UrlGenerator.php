@@ -1,5 +1,6 @@
 <?php
 
+
 class UrlGenerator
 {
     public function getCheckUrl($cmid, $fileid)

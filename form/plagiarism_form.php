@@ -1,8 +1,9 @@
 <?php
 
+
 class plagiarism_setup_form extends moodleform {
 
-/// Define the form
+// Define the form
     function definition () {
         global $CFG;
 

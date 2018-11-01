@@ -1,5 +1,6 @@
 <?php
 
+
 echo $OUTPUT->header();
 ?>
 
@@ -17,12 +18,14 @@ echo $OUTPUT->header();
     <br/>
     <div class="plagiarism-preview-content">
         <div class="plagiarism-preview-content-inner">
-            <?php echo nl2br(htmlspecialchars($content, ENT_COMPAT | ENT_HTML401, $encoding = 'UTF-8')) ?>
+            <?php
+ echo nl2br(htmlspecialchars($content, ENT_COMPAT | ENT_HTML401, $encoding = 'UTF-8')) ?>
         </div>
     </div>
     <br/>
     <div>
         <?php
+
 
         if ($isSupported) {
             echo $form->display();
@@ -32,4 +35,5 @@ echo $OUTPUT->header();
         ?>
     </div>
 <?php
+
 echo $OUTPUT->footer();

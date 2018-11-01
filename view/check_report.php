@@ -1,5 +1,6 @@
 <?php
 
+
 echo $OUTPUT->header();
 ?>
 <style>
@@ -19,7 +20,10 @@ echo $OUTPUT->header();
 </style>
 
 <div>
-    <div id="plagcheck-loader" data-cmid="<?php echo intval($cmid)?>" data-file="<?php echo intval($fileid)?>" class="loader"></div>
+    <div id="plagcheck-loader" data-cmid="<?php
+ echo intval($cmid)?>" data-file="<?php
+ echo intval($fileid)?>" class="loader"></div>
 </div>
 <?php
+
 echo $OUTPUT->footer();
