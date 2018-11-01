@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/PlagiarismCheck/moodle-plagiarism_pchkorg.svg?branch=master)](https://travis-ci.org/PlagiarismCheck/moodle-plagiarism_pchkorg)
+
+
 Plagiarism Check Plugin.
 
 This plugin provide functionality for Plagiarismcheck.org service.
