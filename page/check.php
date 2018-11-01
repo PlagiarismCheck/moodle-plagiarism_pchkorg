@@ -1,4 +1,5 @@
 <?php
+
 require_once(__DIR__ . '/../../../config.php');
 require_once(__DIR__ . '/../lib.php');
 require_once(__DIR__ . '/../form/send_text_form.php');

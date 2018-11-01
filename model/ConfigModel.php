@@ -1,5 +1,6 @@
 <?php
 
+
 class ConfigModel
 {
     private $db;

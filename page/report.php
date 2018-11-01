@@ -1,5 +1,6 @@
 <?php
 
+
 require_once(__DIR__ . '/../../../config.php');
 require_once(__DIR__ . '/../lib.php');
 require_once(__DIR__ . '/../form/send_text_form.php');
@@ -39,7 +40,7 @@ if ('POST' === $_SERVER['REQUEST_METHOD']) {// form submission
 
     $file = $fs->get_file_by_id($fileid);
     if (!$file) {
-        //file not found
+        // file not found
 
         die('404 not exists');
     }
@@ -74,7 +75,7 @@ if ('POST' === $_SERVER['REQUEST_METHOD']) {// form submission
 
 $file = $fs->get_file_by_id($fileid);
 if (!$file) {
-    //file not found
+    // file not found
 
     die('404 not exists');
 }
