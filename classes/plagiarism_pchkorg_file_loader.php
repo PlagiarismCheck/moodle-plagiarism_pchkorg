@@ -14,24 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * @package   plagiarism_pchkorg
- * @category  plagiarism
- * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
 defined('MOODLE_INTERNAL') || die();
 
-if (!isset($plugin)) {
-    $plugin = new stdClass();
-}
-$plugin->version = 2019013001;
-$plugin->requires = 2017051501; // Requires Moodle 3.3 .
-$plugin->release = 'v2.0';
-$plugin->maturity = MATURITY_STABLE;
+class plagiarism_pchkorg_file_loader {
 
-$plugin->component = 'plagiarism_pchkorg';
-$plugin->dependencies = array(
-        'mod_assign' => ANY_VERSION,
-);
+}
