@@ -55,6 +55,10 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             return '';
         }
 
+        if (!$apiprovider->is_group_member($USER->email)) {
+            return '';
+        }
+
         $where = new \stdClass();
         $where->cm = $cmid;
         $where->fileid = $file->get_id();
@@ -66,9 +70,6 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         if ($filerecord) {
             $label = sprintf('%.2f', $filerecord->score) . '%';
         } else {
-            if (!$apiprovider->is_group_member($USER->email)) {
-                return '';
-            }
             $label = get_string('pchkorg_check_for_plagiarism', 'plagiarism_pchkorg');
         }
 
