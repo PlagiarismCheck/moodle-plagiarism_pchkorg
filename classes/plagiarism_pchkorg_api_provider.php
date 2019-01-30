@@ -236,23 +236,11 @@ class plagiarism_pchkorg_api_provider {
         return $id;
     }
 
-    public function get_report($id) {
-        $curl = new curl();
-        $response = $curl->get($this->endpoint . '/api/v1/text/report/' . $id, array(), array(
-                'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_FOLLOWLOCATION' => true,
-                'CURLOPT_SSL_VERIFYHOST' => false,
-                'CURLOPT_SSL_VERIFYPEER' => false,
-                'CURLOPT_POST' => false,
-                'CURLOPT_HTTPHEADER' => array(
-                        'X-API-TOKEN: ' . $this->generate_api_token(),
-                ),
-        ));
-
-        return $response;
+    public function get_report_action($id) {
+        return "{$this->endpoint}/lms/public-report/{$id}/";
     }
 
-    private function generate_api_token() {
+    public function generate_api_token() {
         global $USER;
 
         if ($this->is_group_token()) {
