@@ -69,11 +69,13 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
 
         if ($filerecord) {
             $label = sprintf('%.2f', $filerecord->score) . '%';
+            $link = sprintf(' <a href="%s" target="_blank">( %s )</a> ', $checkurl->__toString(), $label);
         } else {
             $label = get_string('pchkorg_check_for_plagiarism', 'plagiarism_pchkorg');
+            $link = sprintf(' <a href="%s">( %s )</a> ', $checkurl->__toString(), $label);
         }
 
-        return sprintf(' <a href="%s">( %s )</a> ', $checkurl->__toString(), $label);
+        return $link;
     }
 
     /* hook to save plagiarism specific settings on a module settings page

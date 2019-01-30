@@ -17,26 +17,17 @@
 defined('MOODLE_INTERNAL') || die();
 
 if (empty($error)) {
-    $PAGE->requires->css(new moodle_url('/plagiarism/pchkorg/assets/viewer/public-report.min.css'));
-    $PAGE->requires->js(new moodle_url('/plagiarism/pchkorg/assets/viewer/public-report.bundle.min.js'), true);
-    $PAGE->requires->js_init_code(
-            '
-        initPublicReport({
-            container: window.document.getElementById(\'report-root\'),
-            basename: "'.$currenturl->get_path().'",
-            localData: ' . (empty($data) ? '{}' : $data) . '
-        });
-      ', true
-    );
-}
-
-echo $OUTPUT->header();
-
-?>
-    <div class="pCheck-container"></div>
-    <div id="report-root"></div>
-<?php
-if (!empty($error)) {
+    $PAGE->requires->js_init_code('window.document.getElementById("plagiarism_pchkorg_report_id").submit();', true);
+    echo $OUTPUT->header();
+    ?>
+    <form id="plagiarism_pchkorg_report_id" action="<?php echo htmlspecialchars($action) ?>" method="post">
+        <input type="hidden" name="token" value="<?php echo htmlspecialchars($token) ?>"/>
+        <input type="hidden" name="lms-type" value="moodle"/>
+        <input type="submit" value="Check Report">
+    </form>
+    <?php
+} else {
+    echo $OUTPUT->header();
     ?>
     <h2>Error: <?php
         echo htmlspecialchars($error) ?></h2>

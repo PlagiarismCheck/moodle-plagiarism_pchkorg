@@ -36,7 +36,6 @@ $cm = get_coursemodule_from_id('', $cmid, 0, false, MUST_EXIST);
 require_login($cm->course, true, $cm);
 $context = context_module::instance($cm->id);// Get context of course.
 
-
 $isgranted = is_viewing($context, null, 'plagiarism/pchkorg:check');
 if (!$isgranted) {
     die('403 permission denied');
@@ -156,14 +155,8 @@ if (!$filerecord) {
 
     require('../view/send_text.php');
 } else if (null !== $filerecord->reportid) {
-    $report = $apiprovider->get_report($filerecord->textid);
-    $json = json_decode($report);
-    $error = '';
-    if (isset($json->message)) {
-        $error = $json->message;
-    } else {
-        $data = $report;
-    }
+    $action = $apiprovider->get_report_action($filerecord->textid);
+    $token = $apiprovider->generate_api_token();
 
     require('../view/report.php');
 } else if (null !== $filerecord->textid) {
