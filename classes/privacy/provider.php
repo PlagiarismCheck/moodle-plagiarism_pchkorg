@@ -20,8 +20,14 @@ defined('MOODLE_INTERNAL') || die();
 
 use core_privacy\local\metadata\collection;
 
-class provider implements \core_privacy\local\metadata\provider {
-    public static function get_metadata(collection $collection): collection {
+class provider implements
+        \core_privacy\local\metadata\provider,
+        \core_privacy\local\request\plugin\provider {
+
+    // This trait must be included.
+    use \core_privacy\local\legacy_polyfill;
+
+    public static function _get_metadata(collection $collection) {
 
         $collection->add_subsystem_link(
                 'core_files',
