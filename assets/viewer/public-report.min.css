@@ -1,3 +1,4 @@
+/* stylelint-disable */
 @import url(https://fonts.googleapis.com/css?family=Roboto);@charset "UTF-8";
 * {
   box-sizing: border-box; }
@@ -1213,3 +1214,4 @@ html body .RootLayout .CheckBox-report:checked {
 @media only screen and (min-width: 1025px) and (max-width: 1440px) {
   .Report {
     margin: 0; } }
+/* stylelint-enable */
