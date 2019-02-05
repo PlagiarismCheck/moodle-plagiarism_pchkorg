@@ -33,6 +33,7 @@ $string['pchkorg_token'] = 'API Token';
 $string['pchkorg_token_help'] = 'You can receive your token by contact us';
 $string['pchkorg_description'] = 'You can receive your token by contact us';
 $string['pchkorg_submit'] = 'Submit';
+$string['pchkorg_check_for_plagiarism_report'] = 'View report';
 $string['savedconfigsuccess'] = 'Settings had been changed';
 $string['pchkorg_check_for_plagiarism'] = 'Check for plagiarism';
 
