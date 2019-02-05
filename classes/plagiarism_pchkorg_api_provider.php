@@ -226,14 +226,13 @@ class plagiarism_pchkorg_api_provider {
                         'Content-Type: application/x-www-form-urlencoded'
                 ),
         ));
-        $id = null;
         if ($json = json_decode($response)) {
             if (isset($json->data) && 5 == $json->data->state) {
-                $id = $json->data->report->id;
+                return $json->data->report;
             }
         }
 
-        return $id;
+        return null;
     }
 
     public function get_report_action($id) {

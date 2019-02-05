@@ -69,20 +69,10 @@ if (!$filerecord) {
     ));
 }
 
-$reportid = $apiprovider->check_text($filerecord->textid);
-if ($checked = (null !== $reportid)) {
-    $report = $apiprovider->get_report($filerecord->textid);
-    $json = json_decode($report);
-    $score = 0;
-    if (isset($json->data)
-            && isset($json->data->report)
-            && isset($json->data->report->percent)
-    ) {
-        $score = $json->data->report->percent;
-    }
-
-    $filerecord->reportid = $reportid;
-    $filerecord->score = $score;
+$report = $apiprovider->check_text($filerecord->textid);
+if ($checked = (null !== $report)) {
+    $filerecord->reportid = $report->id;
+    $filerecord->score = $report->percent;
     $DB->update_record('plagiarism_pchkorg_files', $filerecord);
 }
 
