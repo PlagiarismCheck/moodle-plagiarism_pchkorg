@@ -14,6 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -25,6 +32,9 @@ require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_url_generator.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
 
+/**
+ * Class plagiarism_plugin_pchkorg
+ */
 class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     /**
      * hook to allow plagiarism specific information to be displayed beside a submission
@@ -46,6 +56,10 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
 
         $cmid = $linkarray['cmid'];
         $file = $linkarray['file'];
+        $context = null;
+        if (!empty($cmid)) {
+            $context = context_module::instance($cmid);// Get context of course.
+        }
 
         if (!$pchkorgconfigmodel->is_enabled_for_module($cmid)) {
             return '';
@@ -56,6 +70,11 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         }
 
         if (!$apiprovider->is_group_member($USER->email)) {
+            return '';
+        }
+
+        $isgranted = !empty($context) && has_capability('mod/assign:view', $context, null);
+        if (!$isgranted) {
             return '';
         }
 
@@ -81,6 +100,10 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     /* hook to save plagiarism specific settings on a module settings page
      * @param object $data - data from an mform submission.
     */
+    /**
+     * @param $data
+     * @throws dml_exception
+     */
     public function save_form_elements($data) {
         global $DB;
 
@@ -113,6 +136,13 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         }
     }
 
+    /**
+     * @param object $mform
+     * @param object $context
+     * @param string $modulename
+     * @throws coding_exception
+     * @throws dml_exception
+     */
     public function get_form_elements_module($mform, $context, $modulename = '') {
         if (!$context || !isset($modulename)) {
             return;
@@ -174,6 +204,12 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         echo $OUTPUT->box_end();
     }
 
+    /**
+     * @param $message
+     * @param null $param
+     * @return string
+     * @throws coding_exception
+     */
     public static function trans($message, $param = null) {
         return get_string($message, 'plagiarism_pchkorg', $param);
     }

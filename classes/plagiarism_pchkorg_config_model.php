@@ -14,21 +14,47 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Class plagiarism_pchkorg_config_model
+ */
 class plagiarism_pchkorg_config_model {
+    /**
+     * @var
+     */
     private $db;
 
+    /**
+     * plagiarism_pchkorg_config_model constructor.
+     *
+     * @param $DB
+     */
     public function __construct($DB) {
         $this->db = $DB;
     }
 
+    /**
+     * @param $module
+     * @return mixed
+     */
     public function fetch_by_module($module) {
         return $this->db->get_records('plagiarism_pchkorg_config', array(
                 'cm' => $module,
         ));
     }
 
+    /**
+     * @param $module
+     * @return bool
+     */
     public function is_enabled_for_module($module) {
         $configs = $this->fetch_by_module($module);
         $enabled = false;
@@ -45,6 +71,10 @@ class plagiarism_pchkorg_config_model {
         return $enabled;
     }
 
+    /**
+     * @param $name
+     * @param $value
+     */
     public function set_system_config($name, $value) {
         $this->db->delete_records('plagiarism_pchkorg_config', array(
                 'cm' => 0,
@@ -59,6 +89,10 @@ class plagiarism_pchkorg_config_model {
         $this->db->insert_record('plagiarism_pchkorg_config', $record);
     }
 
+    /**
+     * @param $name
+     * @return |null
+     */
     public function get_system_config($name) {
         $records = $this->db->get_records('plagiarism_pchkorg_config', array(
                 'cm' => 0,
@@ -72,6 +106,9 @@ class plagiarism_pchkorg_config_model {
         return null;
     }
 
+    /**
+     * @return array
+     */
     public function get_all_system_config() {
         $records = $this->db->get_records('plagiarism_pchkorg_config', array(
                 'cm' => 0,

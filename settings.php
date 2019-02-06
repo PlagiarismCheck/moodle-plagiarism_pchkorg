@@ -13,10 +13,11 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
- * pl * plagiarism.php - allows the admin to configure plagiarism stuff
- *
  * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

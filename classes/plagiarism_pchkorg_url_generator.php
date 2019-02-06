@@ -14,9 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Class plagiarism_pchkorg_url_generator
+ */
 class plagiarism_pchkorg_url_generator {
+    /**
+     * @param $cmid
+     * @param $fileid
+     * @return moodle_url
+     * @throws moodle_exception
+     */
     public function get_check_url($cmid, $fileid) {
         return new moodle_url(sprintf(
                         '/plagiarism/pchkorg/page/report.php?cmid=%s&file=%s',
@@ -26,6 +42,10 @@ class plagiarism_pchkorg_url_generator {
         );
     }
 
+    /**
+     * @return moodle_url
+     * @throws moodle_exception
+     */
     public function get_status_url() {
         return new moodle_url('/plagiarism/pchkorg/page/status.php');
     }
