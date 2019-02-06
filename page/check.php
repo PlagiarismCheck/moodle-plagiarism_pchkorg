@@ -14,6 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 require_once(__DIR__ . '/../../../config.php');
 require_once(__DIR__ . '/../lib.php');
 require_once(__DIR__ . '/../form/send_text_form.php');
@@ -37,7 +44,7 @@ $cm = get_coursemodule_from_id('', $cmid);
 require_login($cm->course, true, $cm);
 $context = context_module::instance($cm->id);
 header('Content-Type: application/json');
-$isgranted = is_viewing($context, null, 'plagiarism/pchkorg:check');
+$isgranted = has_capability('mod/assign:view', $context, null);
 if (!$isgranted) {
     die('{error: "access denied"}');
 }

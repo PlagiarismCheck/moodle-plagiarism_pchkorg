@@ -14,16 +14,32 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Class plagiarism_pchkorg_api_provider
+ */
 class plagiarism_pchkorg_api_provider {
 
+    /**
+     * @var
+     */
     private $token;
     /**
      * @var string
      */
     private $endpoint;
 
+    /**
+     * @var
+     */
     private $lasterror;
 
     /**
@@ -40,11 +56,28 @@ class plagiarism_pchkorg_api_provider {
         $this->lasterror = $lasterror;
     }
 
+    /**
+     * plagiarism_pchkorg_api_provider constructor.
+     *
+     * @param $token
+     * @param string $endpoint
+     */
     public function __construct($token, $endpoint = 'https://plagiarismcheck.org') {
         $this->token = $token;
         $this->endpoint = $endpoint;
     }
 
+    /**
+     * @param $authorhash
+     * @param $cousereid
+     * @param $assignmentid
+     * @param $submissionid
+     * @param $attachmentid
+     * @param $content
+     * @param $mime
+     * @param $filename
+     * @return |null
+     */
     public function send_group_text($authorhash, $cousereid, $assignmentid, $submissionid, $attachmentid, $content, $mime,
             $filename) {
 
@@ -88,6 +121,18 @@ class plagiarism_pchkorg_api_provider {
         return $id;
     }
 
+    /**
+     * @param $boundary
+     * @param $authorhash
+     * @param $cousereid
+     * @param $assignmentid
+     * @param $submissionid
+     * @param $attachmentid
+     * @param $content
+     * @param $mime
+     * @param $filename
+     * @return string
+     */
     private function get_body_for_group($boundary,
             $authorhash,
             $cousereid,
@@ -114,6 +159,12 @@ class plagiarism_pchkorg_api_provider {
         return $body;
     }
 
+    /**
+     * @param $content
+     * @param $mime
+     * @param $filename
+     * @return |null
+     */
     public function send_text($content, $mime, $filename) {
         $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
@@ -147,6 +198,12 @@ class plagiarism_pchkorg_api_provider {
         return $id;
     }
 
+    /**
+     * @param $name
+     * @param $value
+     * @param $boundary
+     * @return string
+     */
     private function get_part($name, $value, $boundary) {
         $eol = "\r\n";
 
@@ -157,6 +214,14 @@ class plagiarism_pchkorg_api_provider {
         return $part;
     }
 
+    /**
+     * @param $name
+     * @param $value
+     * @param $mime
+     * @param $filename
+     * @param $boundary
+     * @return string
+     */
     private function get_file_part($name, $value, $mime, $filename, $boundary) {
         $eol = "\r\n";
 
@@ -169,6 +234,13 @@ class plagiarism_pchkorg_api_provider {
         return $part;
     }
 
+    /**
+     * @param $boundary
+     * @param $content
+     * @param $mime
+     * @param $filename
+     * @return string
+     */
     private function get_body($boundary, $content, $mime, $filename) {
         $eol = "\r\n";
 
@@ -180,14 +252,25 @@ class plagiarism_pchkorg_api_provider {
         return $body;
     }
 
+    /**
+     * @param $email
+     * @return string
+     */
     public function user_email_to_hash($email) {
         return hash('sha256', $this->token . $email);
     }
 
+    /**
+     * @return bool
+     */
     public function is_group_token() {
         return 'G-' === \substr($this->token, 0, 2);
     }
 
+    /**
+     * @param string $email
+     * @return bool
+     */
     public function is_group_member($email = '') {
         if (!$this->is_group_token()) {
             return true;
@@ -213,6 +296,10 @@ class plagiarism_pchkorg_api_provider {
         return false;
     }
 
+    /**
+     * @param $textid
+     * @return |null
+     */
     public function check_text($textid) {
         $curl = new curl();
         $response = $curl->get($this->endpoint . '/api/v1/text/' . $textid, array(), array(
@@ -235,10 +322,17 @@ class plagiarism_pchkorg_api_provider {
         return null;
     }
 
+    /**
+     * @param $id
+     * @return string
+     */
     public function get_report_action($id) {
         return "{$this->endpoint}/lms/public-report/{$id}/";
     }
 
+    /**
+     * @return string
+     */
     public function generate_api_token() {
         global $USER;
 
@@ -249,6 +343,10 @@ class plagiarism_pchkorg_api_provider {
         return $this->token;
     }
 
+    /**
+     * @param $mime
+     * @return bool
+     */
     public function is_supported_mime($mime) {
         return in_array($mime, array(
                 'application/msword',

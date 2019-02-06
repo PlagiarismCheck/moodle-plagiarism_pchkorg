@@ -14,10 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * @package   plagiarism_pchkorg
+ * @category  plagiarism
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Class plagiarism_pchkorg_setup_form
+ */
 class plagiarism_pchkorg_setup_form extends moodleform {
 
+    /**
+     * @throws coding_exception
+     */
     public function definition() {
 
         $mform = &$this->_form;
@@ -42,6 +55,12 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $this->add_action_buttons(true);
     }
 
+    /**
+     * @param $message
+     * @param null $param
+     * @return string
+     * @throws coding_exception
+     */
     public static function trans($message, $param = null) {
         return get_string($message, 'plagiarism_pchkorg', $param);
     }
