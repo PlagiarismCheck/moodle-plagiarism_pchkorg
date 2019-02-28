@@ -45,30 +45,41 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
      */
     public function get_links($linkarray) {
         global $DB, $USER;
-        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
-        $urlgenerator = new plagiarism_pchkorg_url_generator();
-        $apiprovider = new plagiarism_pchkorg_api_provider($pchkorgconfigmodel->get_system_config('pchkorg_token'));
 
+        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
+        $urlgenerator = new plagiarism_pchkorg_url_generator();
+        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+
+        $cmid = $linkarray['cmid'];
+        $file = $linkarray['file'];
+
+        // We can do nothing with submissions which we can not handle.
+        if (!$apiprovider->is_supported_mime($file->get_mimetype())) {
+            return '';
+        }
+
+        // SQL will be called only once, result is static.
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' !== $config) {
             return '';
         }
 
-        $cmid = $linkarray['cmid'];
-        $file = $linkarray['file'];
         $context = null;
         if (!empty($cmid)) {
             $context = context_module::instance($cmid);// Get context of course.
         }
 
+        // SQL will be called only once per page. There is static result inside.
         if (!$pchkorgconfigmodel->is_enabled_for_module($cmid)) {
             return '';
         }
 
-        if (!$apiprovider->is_supported_mime($file->get_mimetype())) {
-            return '';
-        }
-
+        // Only for some type of account, method will call a remote HTTP API.
+        // The API will be called only once, because result is static.
+        // Also, there is timeout 2 seconds for response.
+        // Even if service is unavailable, method will try call only once.
+        // Also, we don't use use raw user email.
         if (!$apiprovider->is_group_member($USER->email)) {
             return '';
         }
@@ -107,7 +118,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     public function save_form_elements($data) {
         global $DB;
 
-        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
+        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' != $config) {
@@ -144,12 +155,12 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
      * @throws dml_exception
      */
     public function get_form_elements_module($mform, $context, $modulename = '') {
-        if (!$context || !isset($modulename)) {
+        if (!$context || !isset($modulename) || 'mod_assign' !== $modulename) {
             return;
         }
         global $DB;
 
-        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
+        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' == $config) {
@@ -160,17 +171,15 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                         'cm' => $cm,
                 ));
                 if (!empty($records)) {
-                    foreach ($records as $record) {
-                        $mform->setDefault($record->name, $record->value);
-                    }
+                    $mform->setDefault($records[0]->name, $records[0]->value);
                 }
             }
 
-            $mform->addElement('header', 'plagiarism_pchkorg', self::trans('pluginname'));
+            $mform->addElement('header', 'plagiarism_pchkorg', get_string('pluginname', 'plagiarism_pchkorg'));
             $mform->addElement(
                     'select',
                     $setting = 'pchkorg_module_use',
-                    self::trans('pchkorg_module_use'),
+                    get_string('pchkorg_module_use', 'plagiarism_pchkorg'),
                     array(get_string('no'), get_string('yes'))
             );
             $mform->addHelpButton('pchkorg_module_use', 'pchkorg_module_use', 'plagiarism_pchkorg');
@@ -188,29 +197,41 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
      * @return string
      */
     public function print_disclosure($cmid) {
-        global $OUTPUT, $DB;
+        global $OUTPUT;
 
-        $configmodel = new plagiarism_pchkorg_config_model($DB);
+        if (empty($cmid)) {
+            return '';
+        }
 
-        echo $OUTPUT->box_start('generalbox boxaligncenter', 'intro');
+        // Get course details.
+        $cm = get_coursemodule_from_id('', $cmid);
+
+        if ($cm->modname != 'assign') {
+            return '';
+        }
+
+        $configmodel = new plagiarism_pchkorg_config_model();
+
+        $enabled = $configmodel->get_system_config('pchkorg_use');
+        if ($enabled !== '1') {
+            return '';
+        }
+
+        if ($configmodel->is_enabled_for_module($cmid) != '1') {
+            return '';
+        }
+
+        $result = '';
+
+        $result .= $OUTPUT->box_start('generalbox boxaligncenter', 'intro');
 
         $formatoptions = new stdClass;
         $formatoptions->noclean = true;
         $formatoptions->cmid = $cmid;
-        $text = $configmodel->get_system_config('plagiarism_pchkorg');
 
-        echo format_text($text, FORMAT_MOODLE, $formatoptions);
+        $result .= format_text(get_string('pchkorg_disclosure', 'plagiarism_pchkorg'), FORMAT_MOODLE, $formatoptions);
+        $result .= $OUTPUT->box_end();
 
-        echo $OUTPUT->box_end();
-    }
-
-    /**
-     * @param $message
-     * @param null $param
-     * @return string
-     * @throws coding_exception
-     */
-    public static function trans($message, $param = null) {
-        return get_string($message, 'plagiarism_pchkorg', $param);
+        return $result;
     }
 }

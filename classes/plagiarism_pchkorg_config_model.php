@@ -27,48 +27,36 @@ defined('MOODLE_INTERNAL') || die();
  * Class plagiarism_pchkorg_config_model
  */
 class plagiarism_pchkorg_config_model {
-    /**
-     * @var
-     */
-    private $db;
-
-    /**
-     * plagiarism_pchkorg_config_model constructor.
-     *
-     * @param $DB
-     */
-    public function __construct($DB) {
-        $this->db = $DB;
-    }
-
-    /**
-     * @param $module
-     * @return mixed
-     */
-    public function fetch_by_module($module) {
-        return $this->db->get_records('plagiarism_pchkorg_config', array(
-                'cm' => $module,
-        ));
-    }
 
     /**
      * @param $module
      * @return bool
      */
     public function is_enabled_for_module($module) {
-        $configs = $this->fetch_by_module($module);
-        $enabled = false;
-        foreach ($configs as $record) {
-            switch ($record->name) {
-                case 'pchkorg_module_use':
-                    $enabled = '1' == $record->value;
-                    break;
-                default:
-                    break;
+        global $DB;
+
+        static $resultmap = array();
+        // This will be called only once per module.
+        if (!array_key_exists($module, $resultmap)) {
+            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+                    'cm' => $module,
+            ));
+
+            $enabled = false;
+            foreach ($configs as $record) {
+                switch ($record->name) {
+                    case 'pchkorg_module_use':
+                        $enabled = '1' == $record->value;
+                        break;
+                    default:
+                        break;
+                }
             }
+
+            $resultmap[$module] = $enabled;
         }
 
-        return $enabled;
+        return $resultmap[$module];
     }
 
     /**
@@ -76,7 +64,9 @@ class plagiarism_pchkorg_config_model {
      * @param $value
      */
     public function set_system_config($name, $value) {
-        $this->db->delete_records('plagiarism_pchkorg_config', array(
+        global $DB;
+
+        $DB->delete_records('plagiarism_pchkorg_config', array(
                 'cm' => 0,
                 'name' => $name,
         ));
@@ -86,7 +76,7 @@ class plagiarism_pchkorg_config_model {
         $record->name = $name;
         $record->value = $value;
 
-        $this->db->insert_record('plagiarism_pchkorg_config', $record);
+        $DB->insert_record('plagiarism_pchkorg_config', $record);
     }
 
     /**
@@ -94,28 +84,40 @@ class plagiarism_pchkorg_config_model {
      * @return |null
      */
     public function get_system_config($name) {
-        $records = $this->db->get_records('plagiarism_pchkorg_config', array(
-                'cm' => 0,
-                'name' => $name,
-        ));
+        global $DB;
 
-        foreach ($records as $record) {
-            return $record->value;
+        // SQL query will be called only one per one setting name.
+        static $resultsmap = array();
+        if (!array_key_exists($name, $resultsmap)) {
+            $records = $DB->get_records('plagiarism_pchkorg_config', array(
+                    'cm' => 0,
+                    'name' => $name,
+            ));
+
+            foreach ($records as $record) {
+                $resultsmap[$name] = $record->value;
+                break;
+            }
         }
 
-        return null;
+        return $resultsmap[$name];
     }
 
     /**
      * @return array
      */
     public function get_all_system_config() {
-        $records = $this->db->get_records('plagiarism_pchkorg_config', array(
-                'cm' => 0,
-        ));
-        $map = array();
-        foreach ($records as $record) {
-            $map[$record->name] = $record->value;
+        global $DB;
+
+        static $map = array();
+        if (empty($map)) {
+            $records = $DB->get_records('plagiarism_pchkorg_config', array(
+                    'cm' => 0,
+            ));
+
+            foreach ($records as $record) {
+                $map[$record->name] = $record->value;
+            }
         }
 
         return $map;

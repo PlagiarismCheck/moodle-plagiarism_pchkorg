@@ -30,9 +30,7 @@ require_once($CFG->dirroot . '/plagiarism/pchkorg/form/plagiarism_pchkorg_setup_
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
 require_once(__DIR__ . '/lib.php');
 
-global $DB;
-
-$pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
+$pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 
 require_login();
 admin_externalpage_setup('plagiarismpchkorg');
@@ -63,8 +61,6 @@ if (($data = $mform->get_data()) && confirm_sesskey()) {
     }
     $OUTPUT->notification(get_string('savedconfigsuccess', 'plagiarism_pchkorg'), 'notifysuccess');
 }
-
-$pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
 
 $plagiarismsettings = $pchkorgconfigmodel->get_all_system_config();
 

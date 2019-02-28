@@ -36,6 +36,7 @@ $string['pchkorg_submit'] = 'Submit';
 $string['pchkorg_check_for_plagiarism_report'] = 'View report';
 $string['savedconfigsuccess'] = 'Settings had been changed';
 $string['pchkorg_check_for_plagiarism'] = 'Check for plagiarism';
+$string['pchkorg_disclosure'] = 'Submission will be sent to plagiarismcheck.org for check';
 
 $string['privacy:metadata:plagiarism_pchkorg_files'] =
         'Table with information about a file within moodle system belonge to a check in plagiarismcheck.org system.';
@@ -45,6 +46,7 @@ $string['privacy:metadata:plagiarism_pchkorg_files:userid'] = 'Identity of user 
 $string['privacy:metadata:plagiarism_pchkorg_files:score'] = 'Originality score';
 $string['privacy:metadata:plagiarism_pchkorg_files:textid'] = 'Identity of originality check';
 $string['privacy:metadata:plagiarism_pchkorg_files:reportid'] = 'Identity of originality report';
+$string['privacy:metadata:plagiarism_pchkorg_files:signature'] = 'Sha1 signature of content';
 
 $string['privacy:metadata:plagiarism_pchkorg_config'] = 'Table with module settings';
 $string['privacy:metadata:plagiarism_pchkorg_config:cm'] = 'Course module identity';

@@ -38,7 +38,7 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->addElement(
                 'select',
                 $setting = 'pchkorg_use',
-                self::trans('pchkorg_use'),
+                get_string('pchkorg_use', 'plagiarism_pchkorg'),
                 array(get_string('no'), get_string('yes'))
         );
         $mform->addHelpButton('pchkorg_use', 'pchkorg_use', 'plagiarism_pchkorg');
@@ -47,21 +47,11 @@ class plagiarism_pchkorg_setup_form extends moodleform {
             $mform->setDefault($setting, false);
         }
 
-        $mform->addElement('password', 'pchkorg_token', self::trans('pchkorg_token'));
+        $mform->addElement('password', 'pchkorg_token', get_string('pchkorg_token', 'plagiarism_pchkorg'));
         $mform->addHelpButton('pchkorg_token', 'pchkorg_token', 'plagiarism_pchkorg');
         $mform->addRule('pchkorg_token', null, 'required', null, 'client');
         $mform->setType('pchkorg_token', PARAM_TEXT);
 
         $this->add_action_buttons(true);
-    }
-
-    /**
-     * @param $message
-     * @param null $param
-     * @return string
-     * @throws coding_exception
-     */
-    public static function trans($message, $param = null) {
-        return get_string($message, 'plagiarism_pchkorg', $param);
     }
 }

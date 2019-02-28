@@ -55,11 +55,12 @@ class provider implements
                 'plagiarism_pchkorg_files',
                 array(
                         'cm' => 'privacy:metadata:plagiarism_pchkorg_files:cm',
-                        'fileid' => 'privacy:metadata:forum_discussion_subs:fileid',
-                        'userid' => 'privacy:metadata:forum_discussion_subs:userid',
-                        'score' => 'privacy:metadata:forum_discussion_subs:score',
-                        'textid' => 'privacy:metadata:forum_discussion_subs:textid',
-                        'reportid' => 'privacy:metadata:forum_discussion_subs:reportid',
+                        'fileid' => 'privacy:metadata:plagiarism_pchkorg_files:fileid',
+                        'userid' => 'privacy:metadata:plagiarism_pchkorg_files:userid',
+                        'score' => 'privacy:metadata:plagiarism_pchkorg_files:score',
+                        'textid' => 'privacy:metadata:plagiarism_pchkorg_files:textid',
+                        'reportid' => 'privacy:metadata:plagiarism_pchkorg_files:reportid',
+                        'signature' => 'privacy:metadata:plagiarism_pchkorg_files:signature',
 
                 ),
                 'privacy:metadata:plagiarism_pchkorg_files'
