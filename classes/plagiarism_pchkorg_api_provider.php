@@ -63,6 +63,8 @@ class plagiarism_pchkorg_api_provider {
      * @param string $endpoint
      */
     public function __construct($token, $endpoint = 'https://plagiarismcheck.org') {
+
+        $this->endpoint = 'http://plagcheck.local';
         $this->token = $token;
         $this->endpoint = $endpoint;
     }
@@ -257,6 +259,7 @@ class plagiarism_pchkorg_api_provider {
      * @return string
      */
     public function user_email_to_hash($email) {
+        // We don't send raw user email to service.
         return hash('sha256', $this->token . $email);
     }
 
@@ -276,24 +279,31 @@ class plagiarism_pchkorg_api_provider {
             return true;
         }
 
-        $curl = new curl();
-        $response = $curl->post($this->endpoint . '/lms/moodle/is-group-member/', array(
-                'token' => $this->token,
-                'hash' => $this->user_email_to_hash($email)
-        ), array(
-                'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_FOLLOWLOCATION' => true,
-                'CURLOPT_SSL_VERIFYHOST' => false,
-                'CURLOPT_SSL_VERIFYPEER' => false,
-        ));
+        static $resultmap = array();
 
-        if ($json = json_decode($response)) {
-            if (true == $json->is_member) {
-                return true;
+        if (!array_key_exists($email, $resultmap)) {
+            $resultmap[$email] = false;
+            $curl = new curl();
+            $response = $curl->post($this->endpoint . '/lms/moodle/is-group-member/', array(
+                    'token' => $this->token,
+                    'hash' => $this->user_email_to_hash($email)
+            ), array(
+                    'CURLOPT_RETURNTRANSFER' => true,
+                    'CURLOPT_FOLLOWLOCATION' => true,
+                    'CURLOPT_SSL_VERIFYHOST' => false,
+                    'CURLOPT_SSL_VERIFYPEER' => false,
+                // The maximum number of seconds to allow cURL functions to execute.
+                    'CURLOPT_TIMEOUT' => 2
+            ));
+
+            if ($json = json_decode($response)) {
+                if (true == $json->is_member) {
+                    $resultmap[$email] = true;
+                }
             }
         }
 
-        return false;
+        return $resultmap[$email];
     }
 
     /**

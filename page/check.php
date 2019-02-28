@@ -30,9 +30,7 @@ require_once(__DIR__ . '/../classes/plagiarism_pchkorg_api_provider.php');
 
 global $PAGE, $CFG, $OUTPUT, $DB, $USER;
 
-require_login();
-
-$pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
+$pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 $urlgenerator = new plagiarism_pchkorg_url_generator();
 $apiprovider = new plagiarism_pchkorg_api_provider(
         $pchkorgconfigmodel->get_system_config('pchkorg_token')
@@ -42,9 +40,10 @@ $cmid = (int) required_param('cmid', PARAM_INT); // Course Module ID
 $fileid = (int) required_param('file', PARAM_INT); // plagiarism file id.
 $cm = get_coursemodule_from_id('', $cmid);
 require_login($cm->course, true, $cm);
+
 $context = context_module::instance($cm->id);
 header('Content-Type: application/json');
-$isgranted = has_capability('mod/assign:view', $context, null);
+$isgranted = has_capability('mod/assign:grade', $context, null);
 if (!$isgranted) {
     die('{error: "access denied"}');
 }

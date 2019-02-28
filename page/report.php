@@ -30,9 +30,7 @@ require_once(__DIR__ . '/../classes/plagiarism_pchkorg_api_provider.php');
 
 global $PAGE, $CFG, $OUTPUT, $DB, $USER;
 
-require_login();
-
-$pchkorgconfigmodel = new plagiarism_pchkorg_config_model($DB);
+$pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 $urlgenerator = new plagiarism_pchkorg_url_generator();
 $apiprovider = new plagiarism_pchkorg_api_provider($pchkorgconfigmodel->get_system_config('pchkorg_token'));
 
@@ -88,7 +86,6 @@ if ('POST' === $_SERVER['REQUEST_METHOD']) { // Form submission.
         die('404 not exists');
     }
 
-
     if ($apiprovider->is_group_token()) {
         $textid = $apiprovider->send_group_text(
                 $apiprovider->user_email_to_hash($USER->email),
@@ -107,7 +104,6 @@ if ('POST' === $_SERVER['REQUEST_METHOD']) { // Form submission.
                 $file->get_filename()
         );
     }
-
 
     $message = '';
     if (null !== $textid) {
