@@ -91,7 +91,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             $link = sprintf(' <a href="%s" target="_blank">( %s )</a> ', $checkurl->__toString(), $label);
         } else {
             $label = get_string('pchkorg_check_for_plagiarism', 'plagiarism_pchkorg');
-            $link = sprintf(' <a href="%s">( %s )</a> ', $checkurl->__toString(), $label);
+            $link = sprintf(' <a href="%s" target="_blank">( %s )</a> ', $checkurl->__toString(), $label);
         }
 
         return $link;

@@ -245,7 +245,10 @@ class plagiarism_pchkorg_api_provider {
         $eol = "\r\n";
 
         $body = '';
+
         $body .= $this->get_part('language', 'en', $boundary);
+        $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
+        $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
         $body .= $this->get_file_part('text', $content, $mime, $filename, $boundary);
         $body .= '--' . $boundary . '--' . $eol;
 
