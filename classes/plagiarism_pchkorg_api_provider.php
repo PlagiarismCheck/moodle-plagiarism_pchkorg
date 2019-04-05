@@ -24,25 +24,34 @@
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Class plagiarism_pchkorg_api_provider
+ * Class provider HTTP-API methods.
  */
 class plagiarism_pchkorg_api_provider {
 
     /**
-     * @var
+     * Auth token.
+     *
+     * @var string
      */
     private $token;
+
     /**
+     * Url of api.
+     *
      * @var string
      */
     private $endpoint;
 
     /**
-     * @var
+     * Last api error.
+     *
+     * @var string|null
      */
     private $lasterror;
 
     /**
+     * Fetch last api error.
+     *
      * @return mixed
      */
     public function get_last_error() {
@@ -50,6 +59,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Setup last api error.
+     *
      * @param mixed $lasterror
      */
     public function set_last_error($lasterror) {
@@ -57,19 +68,19 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
-     * plagiarism_pchkorg_api_provider constructor.
+     * Constructor for api provider.
      *
      * @param $token
      * @param string $endpoint
      */
     public function __construct($token, $endpoint = 'https://plagiarismcheck.org') {
-
-        $this->endpoint = 'http://plagcheck.local';
         $this->token = $token;
         $this->endpoint = $endpoint;
     }
 
     /**
+     * Send text for originality check.
+     *
      * @param $authorhash
      * @param $cousereid
      * @param $assignmentid
@@ -78,6 +89,7 @@ class plagiarism_pchkorg_api_provider {
      * @param $content
      * @param $mime
      * @param $filename
+     *
      * @return |null
      */
     public function send_group_text($authorhash, $cousereid, $assignmentid, $submissionid, $attachmentid, $content, $mime,
@@ -124,6 +136,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Build HTTP body of request.
+     *
      * @param $boundary
      * @param $authorhash
      * @param $cousereid
@@ -155,6 +169,8 @@ class plagiarism_pchkorg_api_provider {
         $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
         $body .= $this->get_part('filename', $filename, $boundary);
         $body .= $this->get_part('language', 'en', $boundary);
+        $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
+        $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
         $body .= $this->get_file_part('content', $content, $mime, $filename, $boundary);
         $body .= '--' . $boundary . '--' . $eol;
 
@@ -162,12 +178,15 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Send text to the service for check.
+     *
      * @param $content
      * @param $mime
      * @param $filename
      * @return |null
      */
     public function send_text($content, $mime, $filename) {
+
         $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
         $curl = new curl();
@@ -201,6 +220,32 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     *
+     * Method send information to service thar agreement had been accepted.
+     * Method will be called only for personal account type.
+     *
+     */
+    public function save_accepted_agreement() {
+        $curl = new curl();
+        $curl->post(
+                $this->endpoint . '/api/v1/agreement/create/moodle-plugin/2019-04-11/',
+                '',
+                array(
+                        'CURLOPT_RETURNTRANSFER' => true,
+                        'CURLOPT_FOLLOWLOCATION' => true,
+                        'CURLOPT_SSL_VERIFYHOST' => false,
+                        'CURLOPT_SSL_VERIFYPEER' => false,
+                        'CURLOPT_POST' => true,
+                        'CURLOPT_HTTPHEADER' => array(
+                                'X-API-TOKEN: ' . $this->generate_api_token(),
+                        ),
+                )
+        );
+    }
+
+    /**
+     * Build part of HTTP body.
+     *
      * @param $name
      * @param $value
      * @param $boundary
@@ -217,6 +262,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Build part of HTTP body. This part contains file.
+     *
      * @param $name
      * @param $value
      * @param $mime
@@ -237,6 +284,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Build body for http-request.
+     *
      * @param $boundary
      * @param $content
      * @param $mime
@@ -248,6 +297,8 @@ class plagiarism_pchkorg_api_provider {
 
         $body = '';
         $body .= $this->get_part('language', 'en', $boundary);
+        $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
+        $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
         $body .= $this->get_file_part('text', $content, $mime, $filename, $boundary);
         $body .= '--' . $boundary . '--' . $eol;
 
@@ -255,15 +306,20 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Convert user email to sha256 salted hash.
+     *
      * @param $email
      * @return string
      */
     public function user_email_to_hash($email) {
-        // We don't send raw user email to service.
+        // We don't send raw user email to the service.
         return hash('sha256', $this->token . $email);
     }
 
     /**
+     * Check type of service account.
+     * There are two types of accounts: personal and group.
+     *
      * @return bool
      */
     public function is_group_token() {
@@ -271,6 +327,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Check that user belongs to group when it is group account.
+     *
      * @param string $email
      * @return bool
      */
@@ -307,8 +365,11 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Check status of document.
+     * If document has been checked, state is 5.
+     *
      * @param $textid
-     * @return |null
+     * @return object|null
      */
     public function check_text($textid) {
         $curl = new curl();
@@ -333,6 +394,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Build url for the api.
+     *
      * @param $id
      * @return string
      */
@@ -341,6 +404,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Generate token for API auth.
+     *
      * @return string
      */
     public function generate_api_token() {
@@ -354,6 +419,8 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * List of supported mime.
+     *
      * @param $mime
      * @return bool
      */
@@ -364,7 +431,17 @@ class plagiarism_pchkorg_api_provider {
                 'application/rtf',
                 'application/vnd.oasis.opendocument.text',
                 'text/plain',
+                'plain/text',
                 'application/pdf',
         ), true);
+    }
+
+    /**
+     * Return maximum size of document.
+     *
+     * @return int
+     */
+    public function get_max_filesize() {
+        return 20 * 1048576;
     }
 }

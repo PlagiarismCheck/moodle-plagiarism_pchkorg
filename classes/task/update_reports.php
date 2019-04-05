@@ -21,32 +21,36 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace plagiarism_pchkorg\task;
+
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Class plagiarism_pchkorg_url_generator
+ * Update report Scores from Turnitin.
  */
-class plagiarism_pchkorg_url_generator {
+class update_reports extends \core\task\scheduled_task {
+
     /**
-     * @param $cmid
-     * @param $fileid
-     * @return moodle_url
-     * @throws moodle_exception
+     * Get a name of task
+     *
+     * @return string
+     * @throws \coding_exception
      */
-    public function get_check_url($cmid, $fileid) {
-        return new moodle_url(sprintf(
-                        '/plagiarism/pchkorg/page/report.php?cmid=%s&file=%s',
-                        intval($cmid),
-                        intval($fileid)
-                )
-        );
+    public function get_name() {
+        return get_string('updatereportscores', 'plagiarism_pchkorg');
     }
 
     /**
-     * @return moodle_url
-     * @throws moodle_exception
+     * Task execution.
+     *
+     * @throws \dml_exception
      */
-    public function get_status_url() {
-        return new moodle_url('/plagiarism/pchkorg/page/status.php');
+    public function execute() {
+        global $CFG;
+
+        require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
+
+        $plugin = new \plagiarism_plugin_pchkorg();
+        $plugin->cron_update_reports();
     }
 }

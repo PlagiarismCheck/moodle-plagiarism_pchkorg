@@ -23,37 +23,23 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-echo $OUTPUT->header();
-?>
-
-    <style>
-        .plagiarism-preview-content {
-            width: 800px;
-            height: 400px;
-            overflow-y: scroll;
-        }
-
-        .plagiarism-preview-content-inner {
-            /*white-space: pre;*/
-        }
-    </style>
-    <br/>
-    <div class="plagiarism-preview-content">
-        <div class="plagiarism-preview-content-inner">
-            <?php
-            echo nl2br(htmlspecialchars($content, ENT_COMPAT | ENT_HTML401, $encoding = 'UTF-8')) ?>
-        </div>
-    </div>
-    <br/>
-    <div>
-        <?php
-
-        if ($issupported) {
-            echo $form->display();
-        } else {
-            echo 'file not supported';
-        }
-        ?>
-    </div>
-<?php
-echo $OUTPUT->footer();
+$tasks = array(
+    array(
+        'classname' => 'plagiarism_pchkorg\task\update_reports',
+        'blocking' => 0,
+        'minute' => '*/5',
+        'hour' => '*',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*'
+    ),
+    array(
+        'classname' => 'plagiarism_pchkorg\task\send_submissions',
+        'blocking' => 0,
+        'minute' => '*/5',
+        'hour' => '*',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*'
+    ),
+);

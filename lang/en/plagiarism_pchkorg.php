@@ -36,18 +36,23 @@ $string['pchkorg_submit'] = 'Submit';
 $string['pchkorg_check_for_plagiarism_report'] = 'View report';
 $string['savedconfigsuccess'] = 'Settings had been changed';
 $string['pchkorg_check_for_plagiarism'] = 'Check for plagiarism';
-$string['pchkorg_disclosure'] = 'Submission will be sent to plagiarismcheck.org for check';
-
+$string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
+<br />
+By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a> '
+        . 'and <a target="_blank" href="https://plagiarismcheck.org/privacy-policy/">Privacy Policy</a>.';
 $string['privacy:metadata:plagiarism_pchkorg_files'] =
         'Table with information about a file within moodle system belonge to a check in plagiarismcheck.org system.';
 $string['privacy:metadata:plagiarism_pchkorg_files:cm'] = 'Course module identity ';
 $string['privacy:metadata:plagiarism_pchkorg_files:fileid'] = 'Identity of a submitted file';
 $string['privacy:metadata:plagiarism_pchkorg_files:userid'] = 'Identity of user who submit file';
+$string['privacy:metadata:plagiarism_pchkorg_files:state'] = 'Status of a document. For example: queued, sent, checked.';
 $string['privacy:metadata:plagiarism_pchkorg_files:score'] = 'Originality score';
+$string['privacy:metadata:plagiarism_pchkorg_files:created_at'] = 'Date and time when document was saved.';
 $string['privacy:metadata:plagiarism_pchkorg_files:textid'] = 'Identity of originality check';
 $string['privacy:metadata:plagiarism_pchkorg_files:reportid'] = 'Identity of originality report';
 $string['privacy:metadata:plagiarism_pchkorg_files:signature'] = 'Sha1 signature of content';
-
+$string['privacy:metadata:plagiarism_pchkorg_files:attempt'] = 'Amount of sending attempts';
+$string['privacy:metadata:plagiarism_pchkorg_files:itemid'] = 'Identity of submission';
 $string['privacy:metadata:plagiarism_pchkorg_config'] = 'Table with module settings';
 $string['privacy:metadata:plagiarism_pchkorg_config:cm'] = 'Course module identity';
 $string['privacy:metadata:plagiarism_pchkorg_config:name'] = 'Name of option';
@@ -56,6 +61,11 @@ $string['privacy:metadata:plagiarism_pchkorg_config:value'] = 'Value of option';
 $string['privacy:metadata:plagiarism_pchkorg'] = 'Service for originality check plagiarismcheck.org';
 $string['privacy:metadata:plagiarism_pchkorg:file'] =
         'Submission attachment for originality checkprivacy:metadata:plagiarism_pchkorg';
-
 $string['pchkorg:enable'] = 'Enable or Disable plugin';
 $string['privacy:metadata:core_files'] = 'We need a content of submission, for originality check';
+$string['sendqueuedsubmissions'] = '';
+$string['updatereportscores'] = '';
+$string['pchkorg_label_title'] = 'PlagiarismCheck.org ID: %s; Similarity Score: %s%%';
+$string['pchkorg_label_result'] = 'ID: %s Similarity: %s%%';
+$string['pchkorg_label_sent'] = 'ID: %s Sent';
+$string['pchkorg_label_queued'] = 'In queue';
