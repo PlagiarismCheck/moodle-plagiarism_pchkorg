@@ -29,7 +29,6 @@ require_once($CFG->dirroot . '/plagiarism/lib.php');
 require_once($CFG->libdir . '/filelib.php');
 require_once($CFG->libdir . '/accesslib.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
-require_once(__DIR__ . '/classes/plagiarism_pchkorg_url_generator.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
 
 /**
@@ -37,25 +36,30 @@ require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
  */
 class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     /**
-     * hook to allow plagiarism specific information to be displayed beside a submission
+     * hook to allow plagiarism specific information to be displayed beside a submission.
      *
      * @param array $linkarraycontains all relevant information for the plugin to generate a link
      * @return string
      *
      */
     public function get_links($linkarray) {
+
         global $DB, $USER;
 
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
-        $urlgenerator = new plagiarism_pchkorg_url_generator();
         $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
         $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
 
         $cmid = $linkarray['cmid'];
-        $file = $linkarray['file'];
+        if (array_key_exists('file', $linkarray)) {
+            $file = $linkarray['file'];
+        } else {
+            // Online text submission.
+            $file = null;
+        }
 
         // We can do nothing with submissions which we can not handle.
-        if (!$apiprovider->is_supported_mime($file->get_mimetype())) {
+        if (null !== $file && !$apiprovider->is_supported_mime($file->get_mimetype())) {
             return '';
         }
 
@@ -78,8 +82,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         // Only for some type of account, method will call a remote HTTP API.
         // The API will be called only once, because result is static.
         // Also, there is timeout 2 seconds for response.
-        // Even if service is unavailable, method will try call only once.
-        // Also, we don't use use raw user email.
+        // Even if service will be unavailable, method will try call API only once.
+        // Also, we don't use raw user email.
         if (!$apiprovider->is_group_member($USER->email)) {
             return '';
         }
@@ -91,28 +95,94 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
 
         $where = new \stdClass();
         $where->cm = $cmid;
-        $where->fileid = $file->get_id();
-
-        $filerecord = $DB->get_record('plagiarism_pchkorg_files', (array) $where);
-
-        $checkurl = $urlgenerator->get_check_url($cmid, $file->get_id());
-
-        if ($filerecord) {
-            $label = sprintf('%.2f', $filerecord->score) . '%';
-            $link = sprintf(' <a href="%s" target="_blank">( %s )</a> ', $checkurl->__toString(), $label);
+        if ($file === null) {
+            $where->signature = sha1($linkarray['content']);
+            $where->fileid = null;
         } else {
-            $label = get_string('pchkorg_check_for_plagiarism', 'plagiarism_pchkorg');
-            $link = sprintf(' <a href="%s">( %s )</a> ', $checkurl->__toString(), $label);
+            $where->fileid = $file->get_id();
         }
 
-        return $link;
+        $filerecords = $DB->get_records('plagiarism_pchkorg_files', (array) $where,
+                'id', '*', 0, 1);
+
+        if ($filerecords) {
+            $filerecord = end($filerecords);
+
+            $img = new moodle_url('/plagiarism/pchkorg/pix/icon.png');
+            $imgsrc = $img->__toString();
+
+            // Text had been successfully checked.
+            if ($filerecord->state == 5) {
+                $action = $apiprovider->get_report_action($filerecord->textid);
+                $reporttoken = $apiprovider->generate_api_token();
+                $formid = 'plagiarism_pchkorg_report_id_' . $filerecord->id;
+                $score = $filerecord->score;
+                $title = sprintf(get_string('pchkorg_label_title', 'plagiarism_pchkorg'),
+                        $filerecord->textid,
+                        $score);
+                $label = sprintf(get_string('pchkorg_label_result', 'plagiarism_pchkorg'), $filerecord->textid, $score);
+
+                if ($score < 30) {
+                    $color = '#63ec80a1';
+                } else if (30 < $score && $score < 60) {
+                    $color = '#f7b011';
+                } else {
+                    $color = '#f04343';
+                }
+
+                return '
+                <a style="padding: 5px 3px;
+text-decoration: none;
+background-color: ' . $color . ';
+color: black;
+cursor: pointer;
+border-radius: 3px 3px 3px 3px;
+margin: 4px;"
+            href="#" title="' . $title . '"
+            class="plagiarism_pchkorg_report_id_score"
+            onclick="document.getElementById(\'' . $formid . '\').submit(); return false;">
+            <img src="' . $imgsrc . '" alt="logo" width="20px;" />
+            ' . $label . '
+            </a><form target="_blank" id="' . $formid . '" action="' . $action . '" method="post">
+            <input type="hidden" name="token" value="' . $reporttoken . '"/>
+            <input type="hidden" name="lms-type" value="moodle"/>
+        </form>';
+            } else if ($filerecord->state == 10) {
+                $label = get_string('pchkorg_label_queued', 'plagiarism_pchkorg');
+                return '
+                <span style="padding: 5px 3px;
+text-decoration: none;
+background-color: #eeeded;
+color: black;
+border-radius: 3px 3px 3px 3px;
+margin: 4px;"
+            href="#" class="plagiarism_pchkorg_report_id_score">
+                <img src="' . $imgsrc . '" alt="logo" width="20px;" />
+                ' . $label . '
+            </span>';
+            } else if ($filerecord->state == 12) {
+                $label = sprintf(get_string('pchkorg_label_sent', 'plagiarism_pchkorg'), $filerecord->textid);
+                return '
+                <span style="padding: 5px 3px;
+text-decoration: none;
+background-color: #eeeded;
+color: black;
+border-radius: 3px 3px 3px 3px;
+margin: 4px;"
+            href="#" class="plagiarism_pchkorg_report_id_score">
+                <img src="' . $imgsrc . '" alt="logo" width="20px;" />
+                ' . $label . '
+            </span>';
+            }
+        }
+
+        return '';
     }
 
-    /* hook to save plagiarism specific settings on a module settings page
-     * @param object $data - data from an mform submission.
-    */
     /**
-     * @param $data
+     * hook to save plagiarism specific settings on a module settings page
+     *
+     * @param object $data - data from an mform submission.
      * @throws dml_exception
      */
     public function save_form_elements($data) {
@@ -148,6 +218,9 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     }
 
     /**
+     *
+     *  Build plugin settings form.
+     *
      * @param object $mform
      * @param object $context
      * @param string $modulename
@@ -171,7 +244,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                         'cm' => $cm,
                 ));
                 if (!empty($records)) {
-                    $mform->setDefault($records[0]->name, $records[0]->value);
+                    $record = end($records);
+                    $mform->setDefault($record->name, $record->value);
                 }
             }
 
@@ -191,7 +265,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     }
 
     /**
-     * hook to allow a disclosure to be printed notifying users what will happen with their submission
+     * hook to allow a disclosure to be printed notifying users what will happen with their submission.
      *
      * @param int $cmid - course module id
      * @return string
@@ -206,7 +280,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         // Get course details.
         $cm = get_coursemodule_from_id('', $cmid);
 
-        if ($cm->modname != 'assign') {
+        if (!$cm || $cm->modname != 'assign') {
             return '';
         }
 
@@ -217,7 +291,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             return '';
         }
 
-        if ($configmodel->is_enabled_for_module($cmid) != '1') {
+        if (!$configmodel->is_enabled_for_module($cmid)) {
             return '';
         }
 
@@ -229,9 +303,345 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         $formatoptions->noclean = true;
         $formatoptions->cmid = $cmid;
 
+        $result .= '<div style="background-color: #d5ffd5; padding: 10px; border: 1px solid #b7dab7">';
         $result .= format_text(get_string('pchkorg_disclosure', 'plagiarism_pchkorg'), FORMAT_MOODLE, $formatoptions);
+        $result .= '</div>';
         $result .= $OUTPUT->box_end();
 
         return $result;
+    }
+
+    /**
+     *
+     * Method will handle event assessable_uploaded.
+     *
+     * @param $eventdata
+     * @return bool
+     * @throws coding_exception
+     * @throws dml_exception
+     */
+    public function event_handler($eventdata) {
+        global $USER, $DB;
+
+        // We support only assign module so just ignore all other.
+        if ($eventdata['other']['modulename'] !== 'assign') {
+            return true;
+        }
+
+        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
+        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+
+        // SQL will be called only once, result is static.
+        $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
+        if ('1' !== $config) {
+            return true;
+        }
+
+        // Receive couser moudle id.
+        $cmid = $eventdata['contextinstanceid'];
+        // Remove the event if the course module no longer exists.
+        $cm = get_coursemodule_from_id($eventdata['other']['modulename'], $cmid);
+        if (!$cm) {
+            return true;
+        }
+
+        // SQL will be called only once per page. There is static result inside.
+        // Plugin is enabled for this module.
+        if (!$pchkorgconfigmodel->is_enabled_for_module($cm->id)) {
+            return true;
+        }
+
+        // Only for some type of account, method will call a remote HTTP API.
+        // The API will be called only once, because result is static.
+        // Also, there is timeout 2 seconds for response.
+        // Even if service is unavailable, method will try call only once.
+        // Also, we don't use raw users email.
+        if (!$apiprovider->is_group_member($USER->email)) {
+            return true;
+        }
+
+        // Set the author and submitter.
+        $submitter = $eventdata['userid'];
+        $author = (!empty($eventdata['relateduserid'])) ? $eventdata['relateduserid'] : $eventdata['userid'];
+
+        // Related user ID will be NULL if an instructor submits on behalf of a student who is in a group.
+        // To get around this, we get the group ID, get the group members and set the author as the first student in the group.
+        if ((empty($eventdata['relateduserid'])) && ($eventdata['other']['modulename'] == 'assign')
+                && has_capability('mod/assign:editothersubmission', context_module::instance($cm->id), $submitter)) {
+            $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id, groupid');
+            if (!empty($moodlesubmission->groupid)) {
+                $author = $this->get_first_group_author($cm->course, $moodlesubmission->groupid);
+            }
+        }
+
+        // Get actual text content and files to be submitted for draft submissions.
+        // As this won't be present in eventdata for certain event types.
+        if ($eventdata['other']['modulename'] == 'assign' && $eventdata['eventtype'] == "assessable_submitted") {
+            // Get content.
+            $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id');
+            if ($moodletextsubmission = $DB->get_record('assignsubmission_onlinetext',
+                    array('submission' => $moodlesubmission->id), 'onlinetext')) {
+                $eventdata['other']['content'] = $moodletextsubmission->onlinetext;
+            }
+
+            $filesconditions = array(
+                    'component' => 'assignsubmission_file',
+                    'itemid' => $moodlesubmission->id,
+                    'userid' => $author
+            );
+
+            $moodlefiles = $DB->get_records('files', $filesconditions);
+            if ($moodlefiles) {
+                $fs = get_file_storage();
+                foreach ($moodlefiles as $filedb) {
+                    $file = $fs->get_file_by_id($filedb->id);
+
+                    if (!$file) {
+                        // We can not find file so we do not send it in queue.
+                        continue;
+                    } else {
+                        try {
+                            // Check that we can fetch content without exception.
+                            $content = $file->get_content();
+                        } catch (Exception $e) {
+                            // No we can not.
+                            continue;
+                        }
+                    }
+
+                    if ($file->get_filename() === '.') {
+                        continue;
+                    }
+                    $filemime = $file->get_mimetype();
+
+                    // File type is not supported.
+                    if (!$apiprovider->is_supported_mime($filemime)) {
+                        continue;
+                    }
+
+                    $filerecord = new \stdClass();
+                    $filerecord->fileid = $file->get_id();
+                    $filerecord->cm = $cmid;
+                    $filerecord->userid = $USER->id;
+                    $filerecord->textid = null;
+                    $filerecord->state = 10;
+                    $filerecord->created_at = time();
+                    $filerecord->itemid = $eventdata['objectid'];
+                    $filerecord->signature = sha1($content);
+
+                    $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
+                }
+            }
+        }
+
+        // Queue text content to send to plagiarismcheck.org.
+        // If there was an error when creating the assignment then still queue the submission so it can be saved as failed.
+        if (in_array($eventdata['eventtype'], array("content_uploaded", "assessable_submitted"))
+                && !empty($eventdata['other']['content'])) {
+
+            $signature = sha1($eventdata['other']['content']);
+
+            $filesconditions = array(
+                    'signature' => $signature,
+                    'cm' => $cmid,
+                    'userid' => $USER->id,
+                    'itemid' => $eventdata['objectid']
+            );
+
+            $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
+            if ($oldfile) {
+                // There is the same check in database, so we can skip this one.
+                return true;
+            }
+
+            $filerecord = new \stdClass();
+            $filerecord->fileid = null;
+            $filerecord->cm = $cmid;
+            $filerecord->userid = $USER->id;
+            $filerecord->textid = null;
+            $filerecord->state = 10;
+            $filerecord->created_at = time();
+
+            $filerecord->itemid = $eventdata['objectid'];
+            $filerecord->signature = $signature;
+
+            $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
+        }
+
+        return true;
+    }
+
+    /**
+     *
+     * Will find the first user in group assignment.
+     *
+     * @param $cmid
+     * @param $groupid
+     * @return mixed
+     * @throws coding_exception
+     */
+    private function get_first_group_author($cmid, $groupid) {
+        static $context;
+        if (empty($context)) {
+            $context = context_course::instance($cmid);
+        }
+
+        $groupmembers = groups_get_members($groupid, "u.id");
+        foreach ($groupmembers as $author) {
+            if (!has_capability('mod/assign:grade', $context, $author->id)) {
+                return $author->id;
+            }
+        }
+    }
+
+    /**
+     *
+     * Method will be called by cron. Method sends queued files into plagiarism check system.
+     *
+     * @return bool
+     * @throws coding_exception
+     * @throws dml_exception
+     */
+    public function cron_send_submissions() {
+        global $DB;
+
+        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
+        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+
+        // SQL will be called only once, result is static.
+        $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
+        if ('1' !== $config) {
+            return true;
+        }
+
+        $filesconditions = array('state' => 10);
+
+        $moodlefiles = $DB->get_records('plagiarism_pchkorg_files', $filesconditions,
+                'id', '*', 0, 20);
+        if ($moodlefiles) {
+            $fs = get_file_storage();
+
+            foreach ($moodlefiles as $filedb) {
+                $textid = null;
+                $user = $DB->get_record('user', array('id' => $filedb->userid));
+                // This is attached file.
+                $cm = get_coursemodule_from_id('', $filedb->cm);
+                if ($filedb->fileid === null) {
+                    $moodletextsubmission = $DB->get_record('assignsubmission_onlinetext',
+                            array('submission' => $filedb->itemid), '*');
+                    if ($moodletextsubmission) {
+                        $content = $moodletextsubmission->onlinetext;
+
+                        if ($apiprovider->is_group_token()) {
+                            $textid = $apiprovider->send_group_text(
+                                    $apiprovider->user_email_to_hash($user->email),
+                                    $cm->course,
+                                    $cm->id,
+                                    $moodletextsubmission->id,
+                                    $moodletextsubmission->id,
+                                    html_to_text($content, 75, false),
+                                    'plain/text',
+                                    sprintf('%s-submussion.txt', $moodletextsubmission->id)
+                            );
+                        } else {
+                            $textid = $apiprovider->send_text(
+                                    html_to_text($content, 75, false),
+                                    'plain/text',
+                                    sprintf('%s-submussion.txt', $moodletextsubmission->id)
+                            );
+                        }
+                    }
+                } else {
+                    $moodlesubmission = $DB->get_record('assign_submission', array('assignment' => $cm->instance,
+                            'userid' => $filedb->userid, 'id' => $filedb->itemid), 'id');
+                    $file = $fs->get_file_by_id($filedb->fileid);
+                    if ($apiprovider->is_group_token()) {
+                        $textid = $apiprovider->send_group_text(
+                                $apiprovider->user_email_to_hash($user->email),
+                                $cm->course,
+                                $cm->id,
+                                $moodlesubmission->id,
+                                $file->get_id(),
+                                $file->get_content(),
+                                $file->get_mimetype(),
+                                $file->get_filename()
+                        );
+                    } else {
+                        $agreementwhere = array(
+                                'cm' => 0,
+                                'name' => 'accepter_agreement',
+                                'value' => '1'
+                        );
+                        $agreementaccepted = $DB->get_records('plagiarism_pchkorg_config', $agreementwhere);
+                        if (!$agreementaccepted) {
+                            $apiprovider->save_accepted_agreement();
+                            $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
+                        }
+
+                        $textid = $apiprovider->send_text(
+                                $file->get_content(),
+                                $file->get_mimetype(),
+                                $file->get_filename()
+                        );
+                    }
+                }
+
+                $filedbnew = new stdClass();
+                $filedbnew->id = $filedb->id;
+                if ($textid) {
+                    // Text was successfully sent to the service.
+                    $filedbnew->textid = $textid;
+                    $filedbnew->state = 12; // 12 - is SENT.
+                } else {
+                    $filedbnew->attempt = $filedb->attempt + 1;
+                    if ($filedbnew->attempt > 6) {
+                        $filedbnew->state = 11; // Sending error.
+                    }
+                }
+                $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Method will update similarity score and change status of checks.
+     *
+     * @return bool
+     * @throws dml_exception
+     */
+    public function cron_update_reports() {
+        global $DB;
+
+        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
+        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+
+        // SQL will be called only once, result is static.
+        $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
+        if ('1' !== $config) {
+            return true;
+        }
+
+        $filesconditions = array('state' => 12);
+
+        $moodlefiles = $DB->get_records('plagiarism_pchkorg_files', $filesconditions,
+                'id', '*', 0, 20);
+
+        foreach ($moodlefiles as $filedb) {
+            $report = $apiprovider->check_text($filedb->textid);
+            if ($report !== null) {
+                $filedbnew = new stdClass();
+                $filedbnew->id = $filedb->id;
+                $filedbnew->state = 5;
+                $filedbnew->reportid = $report->id;
+                $filedbnew->score = $report->percent;
+
+                $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+            }
+        }
     }
 }

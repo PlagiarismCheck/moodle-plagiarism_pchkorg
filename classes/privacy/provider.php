@@ -57,10 +57,14 @@ class provider implements
                         'cm' => 'privacy:metadata:plagiarism_pchkorg_files:cm',
                         'fileid' => 'privacy:metadata:plagiarism_pchkorg_files:fileid',
                         'userid' => 'privacy:metadata:plagiarism_pchkorg_files:userid',
+                        'state' => 'privacy:metadata:plagiarism_pchkorg_files:state',
                         'score' => 'privacy:metadata:plagiarism_pchkorg_files:score',
+                        'created_at' => 'privacy:metadata:plagiarism_pchkorg_files:created_at',
                         'textid' => 'privacy:metadata:plagiarism_pchkorg_files:textid',
                         'reportid' => 'privacy:metadata:plagiarism_pchkorg_files:reportid',
                         'signature' => 'privacy:metadata:plagiarism_pchkorg_files:signature',
+                        'attempt' => 'privacy:metadata:plagiarism_pchkorg_files:attempt',
+                        'itemid' => 'privacy:metadata:plagiarism_pchkorg_files:itemid',
 
                 ),
                 'privacy:metadata:plagiarism_pchkorg_files'

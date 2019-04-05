@@ -21,24 +21,37 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace plagiarism_pchkorg\task;
+
 defined('MOODLE_INTERNAL') || die();
 
-if (empty($error)) {
-    $PAGE->requires->js_init_code('window.document.getElementById("plagiarism_pchkorg_report_id").submit();', false);
-    echo $OUTPUT->header();
-    ?>
-    <form id="plagiarism_pchkorg_report_id" action="<?php echo htmlspecialchars($action) ?>" method="post">
-        <input type="hidden" name="token" value="<?php echo htmlspecialchars($token) ?>"/>
-        <input type="hidden" name="lms-type" value="moodle"/>
-        <input type="submit" value="<?php echo get_string('pchkorg_check_for_plagiarism_report', 'plagiarism_pchkorg'); ?>">
-    </form>
-    <?php
-} else {
-    echo $OUTPUT->header();
-    ?>
-    <h2>Error: <?php
-        echo htmlspecialchars($error) ?></h2>
-    <?php
-}
+/**
+ * Send queued submissions to Turnitin.
+ */
+class send_submissions extends \core\task\scheduled_task {
 
-echo $OUTPUT->footer();
+    /**
+     * Name of the task.
+     *
+     * @return string
+     * @throws \coding_exception
+     */
+    public function get_name() {
+        return get_string('sendqueuedsubmissions', 'plagiarism_pchkorg');
+    }
+
+    /**
+     * Task execution.
+     *
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    public function execute() {
+        global $CFG;
+
+        require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
+
+        $plugin = new \plagiarism_plugin_pchkorg();
+        $plugin->cron_send_submissions();
+    }
+}

@@ -23,24 +23,21 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->libdir . '/formslib.php');
-
-/**
- * Class send_text_form
- */
-class send_text_form extends moodleform {
-
-    /**
-     * @throws coding_exception
-     */
-    public function definition() {
-        $mform = $this->_form; // Don't forget the underscore!
-
-        $mform->addElement('hidden', 'fileid', '');
-        $mform->setType('fileid', PARAM_INT);
-        $mform->addElement('hidden', 'cmid', '');
-        $mform->setType('cmid', PARAM_INT);
-
-        $this->add_action_buttons(false, get_string('pchkorg_submit', 'plagiarism_pchkorg'));
-    }
-}
+$observers = array (
+    array(
+        'eventname' => '\assignsubmission_file\event\assessable_uploaded',
+        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_file_uploaded'
+    ),
+    array(
+        'eventname' => '\assignsubmission_onlinetext\event\assessable_uploaded',
+        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_onlinetext_uploaded'
+    ),
+    array(
+        'eventname' => '\mod_assign\event\assessable_submitted',
+        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_submitted'
+    ),
+    array(
+        'eventname' => '\core\event\course_module_deleted',
+        'callback'  => 'plagiarism_pchkorg_observer::course_module_deleted'
+    ),
+);

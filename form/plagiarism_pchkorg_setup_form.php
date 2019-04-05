@@ -24,11 +24,14 @@
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Class plagiarism_pchkorg_setup_form
+ * Class defined plugin settings form.
  */
 class plagiarism_pchkorg_setup_form extends moodleform {
 
     /**
+     *
+     * Method defined plugin settings form.
+     *
      * @throws coding_exception
      */
     public function definition() {

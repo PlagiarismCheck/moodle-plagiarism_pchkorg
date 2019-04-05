@@ -21,19 +21,35 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+if (!defined('MOODLE_INTERNAL')) {
+    die('Direct access to this script is forbidden.'); // It must be included from a Moodle page.
+}
 
-require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
+require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
 
+/**
+ * This class subscribe to events.
+ */
 class plagiarism_pchkorg_observer {
+    /**
+     * Handle the course_module_deleted event.
+     * @param \core\event\course_module_deleted $event
+     */
+    public static function course_module_deleted(
+        \core\event\course_module_deleted $event) {
+        global $DB;
+        $eventdata = $event->get_data();
+
+        $DB->delete_records('plagiarism_pchkorg_files', array('cm' => $eventdata['contextinstanceid']));
+        $DB->delete_records('plagiarism_pchkorg_config', array('cm' => $eventdata['contextinstanceid']));
+    }
 
     /**
      * Handle the assignment assessable_uploaded event.
-     *
      * @param \assignsubmission_file\event\assessable_uploaded $event
      */
     public static function assignsubmission_file_uploaded(
-            \assignsubmission_file\event\assessable_uploaded $event) {
+        \assignsubmission_file\event\assessable_uploaded $event) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'file_uploaded';
         $eventdata['other']['modulename'] = 'assign';
@@ -44,11 +60,10 @@ class plagiarism_pchkorg_observer {
 
     /**
      * Handle the assignment assessable_uploaded event.
-     *
      * @param \assignsubmission_onlinetext\event\assessable_uploaded $event
      */
     public static function assignsubmission_onlinetext_uploaded(
-            \assignsubmission_onlinetext\event\assessable_uploaded $event) {
+        \assignsubmission_onlinetext\event\assessable_uploaded $event) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'content_uploaded';
         $eventdata['other']['modulename'] = 'assign';
@@ -59,11 +74,10 @@ class plagiarism_pchkorg_observer {
 
     /**
      * Handle the assignment assessable_submitted event.
-     *
      * @param \mod_assign\event\assessable_submitted $event
      */
     public static function assignsubmission_submitted(
-            \mod_assign\event\assessable_submitted $event) {
+        \mod_assign\event\assessable_submitted $event) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'assessable_submitted';
         $eventdata['other']['modulename'] = 'assign';

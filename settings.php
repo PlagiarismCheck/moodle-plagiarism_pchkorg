@@ -35,7 +35,7 @@ $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 require_login();
 admin_externalpage_setup('plagiarismpchkorg');
 
-$context = context_system::instance(CONTEXT_SYSTEM);
+$context = context_system::instance();
 
 require_capability('moodle/site:config', $context, $USER->id, true, "nopermissions");
 

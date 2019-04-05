@@ -29,6 +29,10 @@ defined('MOODLE_INTERNAL') || die();
 class plagiarism_pchkorg_config_model {
 
     /**
+     *
+     * Check if plugin is enable for some specific module.
+     * Result is static.
+     *
      * @param $module
      * @return bool
      */
@@ -60,6 +64,9 @@ class plagiarism_pchkorg_config_model {
     }
 
     /**
+     *
+     * Save plugin settings.
+     *
      * @param $name
      * @param $value
      */
@@ -104,6 +111,10 @@ class plagiarism_pchkorg_config_model {
     }
 
     /**
+     *
+     * Fetch all plugin settings as array.
+     * Result is static.
+     *
      * @return array
      */
     public function get_all_system_config() {
