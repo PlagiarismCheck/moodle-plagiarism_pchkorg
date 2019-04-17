@@ -137,7 +137,8 @@ background-color: ' . $color . ';
 color: black;
 cursor: pointer;
 border-radius: 3px 3px 3px 3px;
-margin: 4px;"
+margin: 4px;
+display: inline-block;"
             href="#" title="' . $title . '"
             class="plagiarism_pchkorg_report_id_score"
             onclick="document.getElementById(\'' . $formid . '\').submit(); return false;">
@@ -155,7 +156,8 @@ text-decoration: none;
 background-color: #eeeded;
 color: black;
 border-radius: 3px 3px 3px 3px;
-margin: 4px;"
+margin: 4px;
+display: inline-block;"
             href="#" class="plagiarism_pchkorg_report_id_score">
                 <img src="' . $imgsrc . '" alt="logo" width="20px;" />
                 ' . $label . '
@@ -168,7 +170,8 @@ text-decoration: none;
 background-color: #eeeded;
 color: black;
 border-radius: 3px 3px 3px 3px;
-margin: 4px;"
+margin: 4px;
+display: inline-block;"
             href="#" class="plagiarism_pchkorg_report_id_score">
                 <img src="' . $imgsrc . '" alt="logo" width="20px;" />
                 ' . $label . '
@@ -571,11 +574,11 @@ margin: 4px;"
                     } else {
                         $agreementwhere = array(
                                 'cm' => 0,
-                                'name' => 'accepter_agreement',
+                                'name' => 'accepted_agreement',
                                 'value' => '1'
                         );
                         $agreementaccepted = $DB->get_records('plagiarism_pchkorg_config', $agreementwhere);
-                        if (!$agreementaccepted) {
+                        if (empty($agreementaccepted)) {
                             $apiprovider->save_accepted_agreement();
                             $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
                         }
