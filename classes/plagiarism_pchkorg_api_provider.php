@@ -372,6 +372,11 @@ class plagiarism_pchkorg_api_provider {
      * @return object|null
      */
     public function check_text($textid) {
+        if ($this->is_group_token()) {
+            // The same method but for group users.
+            // It uses different auth.
+            return $this->group_check_text($textid);
+        }
         $curl = new curl();
         $response = $curl->get($this->endpoint . '/api/v1/text/' . $textid, array(), array(
                 'CURLOPT_RETURNTRANSFER' => true,
@@ -381,6 +386,36 @@ class plagiarism_pchkorg_api_provider {
                 'CURLOPT_POST' => false,
                 'CURLOPT_HTTPHEADER' => array(
                         'X-API-TOKEN: ' . $this->generate_api_token(),
+                        'Content-Type: application/x-www-form-urlencoded'
+                ),
+        ));
+        if ($json = json_decode($response)) {
+            if (isset($json->data) && 5 == $json->data->state) {
+                return $json->data->report;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Check status of document for Group User
+     * If document has been checked, state is 5.
+     *
+     * @param $textid
+     * @return object|null
+     */
+    public function group_check_text($textid) {
+        $curl = new curl();
+        $response = $curl->get("{$this->endpoint}/lms/check-report/{$textid}/", array(
+                'token' => $this->token
+        ), array(
+                'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_FOLLOWLOCATION' => true,
+                'CURLOPT_SSL_VERIFYHOST' => false,
+                'CURLOPT_SSL_VERIFYPEER' => false,
+                'CURLOPT_POST' => false,
+                'CURLOPT_HTTPHEADER' => array(
                         'Content-Type: application/x-www-form-urlencoded'
                 ),
         ));
