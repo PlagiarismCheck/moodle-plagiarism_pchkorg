@@ -27,7 +27,7 @@ $tasks = array(
     array(
         'classname' => 'plagiarism_pchkorg\task\update_reports',
         'blocking' => 0,
-        'minute' => '*/5',
+        'minute' => '*/2',
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
@@ -36,7 +36,7 @@ $tasks = array(
     array(
         'classname' => 'plagiarism_pchkorg\task\send_submissions',
         'blocking' => 0,
-        'minute' => '*/5',
+        'minute' => '*/2',
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
