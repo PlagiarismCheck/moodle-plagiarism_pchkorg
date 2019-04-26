@@ -594,7 +594,7 @@ display: inline-block;"
                         );
                         $agreementaccepted = $DB->get_records('plagiarism_pchkorg_config', $agreementwhere);
                         if (empty($agreementaccepted)) {
-                            $apiprovider->save_accepted_agreement();
+                            $apiprovider->save_accepted_agreement($user->email);
                             $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
                         }
 

@@ -224,8 +224,15 @@ class plagiarism_pchkorg_api_provider {
      * Method send information to service thar agreement had been accepted.
      * Method will be called only for personal account type.
      *
+     * @param string $email User email
+     * @return void
      */
-    public function save_accepted_agreement() {
+    public function save_accepted_agreement($email) {
+        $token = $this->token;
+        if ($this->is_group_token()) {
+            $token = $this->token . '::' . hash('sha256', $this->token . $email);
+        }
+
         $curl = new curl();
         $curl->post(
                 $this->endpoint . '/api/v1/agreement/create/moodle-plugin/2019-04-11/',
@@ -237,7 +244,7 @@ class plagiarism_pchkorg_api_provider {
                         'CURLOPT_SSL_VERIFYPEER' => false,
                         'CURLOPT_POST' => true,
                         'CURLOPT_HTTPHEADER' => array(
-                                'X-API-TOKEN: ' . $this->generate_api_token(),
+                                'X-API-TOKEN: ' . $token,
                         ),
                 )
         );
