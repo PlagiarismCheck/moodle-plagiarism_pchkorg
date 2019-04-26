@@ -560,6 +560,21 @@ display: inline-block;"
                     $moodlesubmission = $DB->get_record('assign_submission', array('assignment' => $cm->instance,
                             'userid' => $filedb->userid, 'id' => $filedb->itemid), 'id');
                     $file = $fs->get_file_by_id($filedb->fileid);
+
+                    // We can not receive file by id.
+                    // Maybe file does not exist anymore.
+                    // So we mark it as error and continue.
+                    if (!$file || !is_object($file)) {
+                        $filedbnew = new stdClass();
+                        $filedbnew->id = $filedb->id;
+                        $filedbnew->attempt = $filedb->attempt + 1;
+                        $filedbnew->state = 11; // Sending error.
+
+                        $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+
+                        continue;
+                    }
+
                     if ($apiprovider->is_group_token()) {
                         $textid = $apiprovider->send_group_text(
                                 $apiprovider->user_email_to_hash($user->email),
