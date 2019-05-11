@@ -38,8 +38,8 @@ $string['savedconfigsuccess'] = 'Settings had been changed';
 $string['pchkorg_check_for_plagiarism'] = 'Check for plagiarism';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
-By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a> '
-        . 'and <a target="_blank" href="https://plagiarismcheck.org/privacy-policy/">Privacy Policy</a>.';
+By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>
+ and <a target="_blank" href="https://plagiarismcheck.org/privacy-policy/">Privacy Policy</a>.';
 $string['privacy:metadata:plagiarism_pchkorg_files'] =
         'Table with information about a file within moodle system belonge to a check in plagiarismcheck.org system.';
 $string['privacy:metadata:plagiarism_pchkorg_files:cm'] = 'Course module identity ';
