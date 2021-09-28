@@ -13,24 +13,36 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
 /**
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-defined('MOODLE_INTERNAL') || die();
-
-if (!isset($plugin)) {
-    $plugin = new stdClass();
+if (!defined('MOODLE_INTERNAL')) {
+    die('Direct access to this script is forbidden.');
 }
-$plugin->version = 2021092804;
-$plugin->requires = 2017051500; // Requires Moodle 3.3 .
-$plugin->release = 'v3.7.4';
-$plugin->maturity = MATURITY_STABLE;
-$plugin->component = 'plagiarism_pchkorg';
-$plugin->dependencies = array(
-        'mod_assign' => ANY_VERSION,
+
+$capabilities = array(
+    'plagiarism/pchkorg:enable' => array(
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => array(
+            'editingteacher' => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+            'coursecreator'  => CAP_ALLOW
+        ),
+    ),
+    'plagiarism/pchkorg:viewsimilarity' => array(
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => array(
+            'editingteacher' => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+            'student'        => CAP_ALLOW,
+            'coursecreator'  => CAP_ALLOW
+        ),
+    ),
 );

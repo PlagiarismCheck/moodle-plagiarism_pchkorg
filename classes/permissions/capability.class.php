@@ -21,16 +21,24 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+namespace plagiarism_pchkorg\classes\permissions;
 
-if (!isset($plugin)) {
-    $plugin = new stdClass();
+use context_course;
+use context_module;
+
+if (!defined('MOODLE_INTERNAL')) {
+    die('Direct access to this script is forbidden.'); // It must be included from a Moodle page.
 }
-$plugin->version = 2021092804;
-$plugin->requires = 2017051500; // Requires Moodle 3.3 .
-$plugin->release = 'v3.7.4';
-$plugin->maturity = MATURITY_STABLE;
-$plugin->component = 'plagiarism_pchkorg';
-$plugin->dependencies = array(
-        'mod_assign' => ANY_VERSION,
-);
+
+class capability
+{
+
+    /**
+     * ENABLE
+     */
+    const ENABLE = 'plagiarism/pchkorg:enable';
+    /**
+     * VIEW_SIMILARITY
+     */
+    const VIEW_SIMILARITY = 'plagiarism/pchkorg:viewsimilarity';
+}

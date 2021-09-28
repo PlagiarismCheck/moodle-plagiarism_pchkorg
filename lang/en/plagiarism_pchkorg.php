@@ -57,7 +57,6 @@ $string['privacy:metadata:plagiarism_pchkorg_config'] = 'Table with module setti
 $string['privacy:metadata:plagiarism_pchkorg_config:cm'] = 'Course module identity';
 $string['privacy:metadata:plagiarism_pchkorg_config:name'] = 'Name of option';
 $string['privacy:metadata:plagiarism_pchkorg_config:value'] = 'Value of option';
-
 $string['privacy:metadata:plagiarism_pchkorg'] = 'Service for originality check plagiarismcheck.org';
 $string['privacy:metadata:plagiarism_pchkorg:file'] =
         'Submission attachment for originality checkprivacy:metadata:plagiarism_pchkorg';
@@ -69,3 +68,5 @@ $string['pchkorg_label_title'] = 'PlagiarismCheck.org ID: %s; Similarity Score: 
 $string['pchkorg_label_result'] = 'ID: %s Similarity: %s%%';
 $string['pchkorg_label_sent'] = 'ID: %s Sent';
 $string['pchkorg_label_queued'] = 'In queue';
+$string['pchkorg:enable'] = 'Allow to enable/disable PlagiarismCheck.org inside an activity';
+$string['pchkorg:viewsimilarity'] = 'Allow to view similarity value from PlagiarismCheck.org';
