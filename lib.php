@@ -30,6 +30,9 @@ require_once($CFG->libdir . '/filelib.php');
 require_once($CFG->libdir . '/accesslib.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
+require_once(__DIR__ . '/classes/permissions/capability.class.php');
+
+use plagiarism_pchkorg\classes\permissions\capability;
 
 /**
  * Class plagiarism_plugin_pchkorg
@@ -72,6 +75,11 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         $context = null;
         if (!empty($cmid)) {
             $context = context_module::instance($cmid);// Get context of course.
+        }
+
+        $canview = has_capability(capability::VIEW_SIMILARITY, $context);
+        if (!$canview) {
+            return '';
         }
 
         // SQL will be called only once per page. There is static result inside.
@@ -195,9 +203,9 @@ display: inline-block;"
 
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' != $config) {
-
             return;
         }
+
         if (!isset($data->pchkorg_module_use)) {
             return;
         }
@@ -239,7 +247,9 @@ display: inline-block;"
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
-        if ('1' == $config) {
+        $enabled = has_capability(capability::ENABLE, $context);
+
+        if ('1' == $config && $enabled) {
             $defaultcmid = null;
             $cm = optional_param('update', $defaultcmid, PARAM_INT);
             if (null !== $cm) {

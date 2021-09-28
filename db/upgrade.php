@@ -56,4 +56,6 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
 
         upgrade_plugin_savepoint(true, 2021072801, 'plagiarism', 'pchkorg');
     }
+
+    return true;
 }
