@@ -77,6 +77,10 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             $context = context_module::instance($cmid);// Get context of course.
         }
 
+        if (empty($context)) {
+            return '';
+        }
+
         $canview = has_capability(capability::VIEW_SIMILARITY, $context);
         if (!$canview) {
             return '';
