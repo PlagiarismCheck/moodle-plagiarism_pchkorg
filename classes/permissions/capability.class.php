@@ -32,7 +32,6 @@ if (!defined('MOODLE_INTERNAL')) {
 
 class capability
 {
-
     /**
      * ENABLE
      */
@@ -41,4 +40,8 @@ class capability
      * VIEW_SIMILARITY
      */
     const VIEW_SIMILARITY = 'plagiarism/pchkorg:viewsimilarity';
+    /**
+     * CHANGE_MIN_PERCENT_FILTER
+     */
+    const CHANGE_MIN_PERCENT_FILTER = 'plagiarism/pchkorg:changeminpercentfilter';
 }

@@ -36,6 +36,9 @@ $string['pchkorg_submit'] = 'Submit';
 $string['pchkorg_check_for_plagiarism_report'] = 'View report';
 $string['savedconfigsuccess'] = 'Settings had been changed';
 $string['pchkorg_check_for_plagiarism'] = 'Check for plagiarism';
+$string['pchkorg_min_percent'] = 'Exclude sources below X% similarity';
+$string['pchkorg_min_percent_help'] = 'Exclude sources below X% similarity';
+$string['pchkorg_min_percent_range'] = 'Must be between 0 and 99';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>
@@ -70,3 +73,4 @@ $string['pchkorg_label_sent'] = 'ID: %s Sent';
 $string['pchkorg_label_queued'] = 'In queue';
 $string['pchkorg:enable'] = 'Allow to enable/disable PlagiarismCheck.org inside an activity';
 $string['pchkorg:viewsimilarity'] = 'Allow to view similarity value from PlagiarismCheck.org';
+$string['pchkorg:changeminpercentfilter'] = 'Allow changing "Exclude sources below X% similarity"';

@@ -23,6 +23,12 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+
+//function pchkorg_check_pchkorg_min_percent($value)
+//{
+//    return 0 <= $value && $value < 100;
+//}
+
 /**
  * Class defined plugin settings form.
  */
@@ -55,6 +61,16 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->addRule('pchkorg_token', null, 'required', null, 'client');
         $mform->setType('pchkorg_token', PARAM_TEXT);
 
+        $mform->registerRule('check_pchkorg_min_percent', 'callback', 'pchkorg_check_pchkorg_min_percent');
+
+        $mform->addElement('text', 'pchkorg_min_percent', get_string('pchkorg_min_percent', 'plagiarism_pchkorg'));
+        $mform->addHelpButton('pchkorg_min_percent', 'pchkorg_min_percent', 'plagiarism_pchkorg');
+        $mform->addRule('pchkorg_min_percent', null, 'numeric', null, 'client');
+        $mform->addRule('pchkorg_min_percent', get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'), 'check_pchkorg_min_percent');
+        $mform->setType('pchkorg_min_percent', PARAM_INT);
+
+
         $this->add_action_buttons(true);
     }
+
 }

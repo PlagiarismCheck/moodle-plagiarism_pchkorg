@@ -45,4 +45,15 @@ $capabilities = array(
             'coursecreator'  => CAP_ALLOW
         ),
     ),
+    'plagiarism/pchkorg:changeminpercentfilter' => array(
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => array(
+            'editingteacher' => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+            'student'        => CAP_ALLOW,
+            'coursecreator'  => CAP_ALLOW
+        ),
+    ),
 );
