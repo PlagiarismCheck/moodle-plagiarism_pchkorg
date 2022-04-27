@@ -215,14 +215,12 @@ display: inline-block;"
             return;
         }
 
-        if (!isset($data->pchkorg_module_use)) {
-            return;
-        }
         $fields = array('pchkorg_module_use', 'pchkorg_min_percent');
 
         $records = $DB->get_records('plagiarism_pchkorg_config', array(
             'cm' => $data->coursemodule
         ));
+
 
         foreach ($fields as $field) {
             $isfounded = false;
@@ -234,7 +232,7 @@ display: inline-block;"
                     break;
                 }
             }
-            if (!$isfounded) {
+            if (!$isfounded && isset($data->{$field})) {
                 $insert = new \stdClass();
                 $insert->cm = $data->coursemodule;
                 $insert->name = $field;
@@ -269,37 +267,71 @@ display: inline-block;"
         if ('1' == $config && $enabled) {
             $defaultcmid = null;
             $cm = optional_param('update', $defaultcmid, PARAM_INT);
-            if (null !== $cm) {
+            $minpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
+
+            if (null === $cm) {
+                if (!isset($mform->exportValues()['pchkorg_module_use'])
+                    || is_null($mform->exportValues()['pchkorg_module_use'])) {
+                    $mform->setDefault('pchkorg_module_use', '1');
+                }
+                if (!isset($mform->exportValues()['pchkorg_min_percent'])
+                    || is_null($mform->exportValues()['pchkorg_min_percent'])) {
+                    $mform->setDefault('pchkorg_min_percent', $minpercent);
+                }
+            } else {
                 $records = $DB->get_records('plagiarism_pchkorg_config', array(
                     'cm' => $cm,
                 ));
                 if (!empty($records)) {
-                    $record = end($records);
-                    $mform->setDefault($record->name, $record->value);
+                    foreach ($records as $record) {
+                        $mform->setDefault($record->name, $record->value);
+                    }
                 }
             }
 
-            $mform->addElement('header', 'plagiarism_pchkorg', get_string('pluginname', 'plagiarism_pchkorg'));
+            $mform->addElement(
+                'header',
+                'plagiarism_pchkorg',
+                get_string('pluginname', 'plagiarism_pchkorg')
+            );
             $mform->addElement(
                 'select',
-                $setting = 'pchkorg_module_use',
+                'pchkorg_module_use',
                 get_string('pchkorg_module_use', 'plagiarism_pchkorg'),
                 array(get_string('no'), get_string('yes'))
             );
             $mform->addHelpButton('pchkorg_module_use', 'pchkorg_module_use', 'plagiarism_pchkorg');
 
-            if (!isset($mform->exportValues()[$setting]) || is_null($mform->exportValues()[$setting])) {
-                $mform->setDefault($setting, '1');
+            $canchangeminpercent = has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context);
+            if ($canchangeminpercent) {
+                $dissabledattribute = '';
+            } else {
+                $dissabledattribute = 'disabled="disabled"';
+            }
+            $mform->registerRule(
+                'check_pchkorg_min_percent',
+                'callback',
+                'pchkorg_check_pchkorg_min_percent'
+            );
+            $label = get_string('pchkorg_min_percent', 'plagiarism_pchkorg');
+            if (!empty($minpercent)) {
+                $label = \str_replace('X%', $minpercent . '%', $label);
             }
 
-            $mform->registerRule('check_pchkorg_min_percent', 'callback', 'pchkorg_check_pchkorg_min_percent');
-
-            $mform->addElement('text', 'pchkorg_min_percent', get_string('pchkorg_min_percent', 'plagiarism_pchkorg'));
+            $mform->addElement(
+                'text',
+                'pchkorg_min_percent',
+                $label,
+                $dissabledattribute
+            );
             $mform->addHelpButton('pchkorg_min_percent', 'pchkorg_min_percent', 'plagiarism_pchkorg');
             $mform->addRule('pchkorg_min_percent', null, 'numeric', null, 'client');
-            $mform->addRule('pchkorg_min_percent', get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'), 'check_pchkorg_min_percent');
+            $mform->addRule(
+                'pchkorg_min_percent',
+                get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'),
+                'check_pchkorg_min_percent'
+            );
             $mform->setType('pchkorg_min_percent', PARAM_INT);
-
         }
     }
 

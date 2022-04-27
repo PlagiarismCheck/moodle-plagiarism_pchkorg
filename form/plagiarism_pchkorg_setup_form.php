@@ -46,14 +46,14 @@ class plagiarism_pchkorg_setup_form extends moodleform {
 
         $mform->addElement(
                 'select',
-                $setting = 'pchkorg_use',
+                'pchkorg_use',
                 get_string('pchkorg_use', 'plagiarism_pchkorg'),
                 array(get_string('no'), get_string('yes'))
         );
         $mform->addHelpButton('pchkorg_use', 'pchkorg_use', 'plagiarism_pchkorg');
 
-        if (!isset($mform->exportValues()[$setting]) || is_null($mform->exportValues()[$setting])) {
-            $mform->setDefault($setting, false);
+        if (!isset($mform->exportValues()['pchkorg_use']) || is_null($mform->exportValues()['pchkorg_use'])) {
+            $mform->setDefault('pchkorg_use', false);
         }
 
         $mform->addElement('password', 'pchkorg_token', get_string('pchkorg_token', 'plagiarism_pchkorg'));
@@ -63,7 +63,12 @@ class plagiarism_pchkorg_setup_form extends moodleform {
 
         $mform->registerRule('check_pchkorg_min_percent', 'callback', 'pchkorg_check_pchkorg_min_percent');
 
-        $mform->addElement('text', 'pchkorg_min_percent', get_string('pchkorg_min_percent', 'plagiarism_pchkorg'));
+        $label = get_string('pchkorg_min_percent', 'plagiarism_pchkorg');
+        if (!empty($minpercent)) {
+            $label = \str_replace('X%', $minpercent . '%', $label);
+        }
+
+        $mform->addElement('text', 'pchkorg_min_percent', $label);
         $mform->addHelpButton('pchkorg_min_percent', 'pchkorg_min_percent', 'plagiarism_pchkorg');
         $mform->addRule('pchkorg_min_percent', null, 'numeric', null, 'client');
         $mform->addRule('pchkorg_min_percent', get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'), 'check_pchkorg_min_percent');
