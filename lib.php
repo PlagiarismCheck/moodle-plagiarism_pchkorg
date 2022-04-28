@@ -221,18 +221,34 @@ display: inline-block;"
             'cm' => $data->coursemodule
         ));
 
+        $context = context_module::instance($data->coursemodule);
+        $canchangeminpercent = has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context);
 
         foreach ($fields as $field) {
             $isfounded = false;
             foreach ($records as $record) {
                 if ($record->name === $field) {
                     $isfounded = true;
+                    if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
+                        $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
+                        break;
+                    }
+                    if ($field === 'pchkorg_min_percent' && 0 == $data->{$record->name}) {
+                        $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
+                        break;
+                    }
                     $record->value = $data->{$record->name};
                     $DB->update_record('plagiarism_pchkorg_config', $record);
                     break;
                 }
             }
             if (!$isfounded && isset($data->{$field})) {
+                if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
+                    continue;
+                }
+                if ($field === 'pchkorg_min_percent' && 0 == $data->{$field}) {
+                    continue;
+                }
                 $insert = new \stdClass();
                 $insert->cm = $data->coursemodule;
                 $insert->name = $field;
@@ -274,10 +290,10 @@ display: inline-block;"
                     || is_null($mform->exportValues()['pchkorg_module_use'])) {
                     $mform->setDefault('pchkorg_module_use', '1');
                 }
-                if (!isset($mform->exportValues()['pchkorg_min_percent'])
-                    || is_null($mform->exportValues()['pchkorg_min_percent'])) {
-                    $mform->setDefault('pchkorg_min_percent', $minpercent);
-                }
+//                if (!isset($mform->exportValues()['pchkorg_min_percent'])
+//                    || is_null($mform->exportValues()['pchkorg_min_percent'])) {
+//                    $mform->setDefault('pchkorg_min_percent', $minpercent);
+//                }
             } else {
                 $records = $DB->get_records('plagiarism_pchkorg_config', array(
                     'cm' => $cm,
@@ -325,7 +341,7 @@ display: inline-block;"
                 $dissabledattribute
             );
             $mform->addHelpButton('pchkorg_min_percent', 'pchkorg_min_percent', 'plagiarism_pchkorg');
-            $mform->addRule('pchkorg_min_percent', null, 'numeric', null, 'client');
+            $mform->addRule('pchkorg_min_percent', null, 'text', null, 'client');
             $mform->addRule(
                 'pchkorg_min_percent',
                 get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'),
@@ -400,6 +416,7 @@ display: inline-block;"
         }
 
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
+        // Token is needed for API auth.
         $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
         $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
 
@@ -588,23 +605,33 @@ display: inline-block;"
         }
 
         $filesconditions = array('state' => 10);
-
         $moodlefiles = $DB->get_records('plagiarism_pchkorg_files', $filesconditions,
             'id', '*', 0, 20);
         if ($moodlefiles) {
             $fs = get_file_storage();
-
             foreach ($moodlefiles as $filedb) {
                 $textid = null;
                 $user = $DB->get_record('user', array('id' => $filedb->userid));
                 // This is attached file.
                 $cm = get_coursemodule_from_id('', $filedb->cm);
+                // Filter for future search.
+                $systemminpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
+                // Module filter value has a bigger priority then system config value.
+                $moduleminpercent = $pchkorgconfigmodel->get_min_percent_for_module($cm->id);
+                if ($moduleminpercent) {
+                    $minpercent = $moduleminpercent;
+                } else {
+                    $minpercent = $systemminpercent;
+                }
+                $filters = [];
+                if ($minpercent) {
+                    $filters['source_min_percent'] = $minpercent;
+                }
                 if ($filedb->fileid === null) {
                     $moodletextsubmission = $DB->get_record('assignsubmission_onlinetext',
                         array('submission' => $filedb->itemid), '*');
                     if ($moodletextsubmission) {
                         $content = $moodletextsubmission->onlinetext;
-
                         if ($apiprovider->is_group_token()) {
                             $textid = $apiprovider->send_group_text(
                                 $apiprovider->user_email_to_hash($user->email),
@@ -614,13 +641,15 @@ display: inline-block;"
                                 $moodletextsubmission->id,
                                 html_to_text($content, 75, false),
                                 'plain/text',
-                                sprintf('%s-submussion.txt', $moodletextsubmission->id)
+                                sprintf('%s-submussion.txt', $moodletextsubmission->id),
+                                $filters,
                             );
                         } else {
                             $textid = $apiprovider->send_text(
                                 html_to_text($content, 75, false),
                                 'plain/text',
-                                sprintf('%s-submussion.txt', $moodletextsubmission->id)
+                                sprintf('%s-submussion.txt', $moodletextsubmission->id),
+                                $filters
                             );
                         }
                     }
@@ -652,7 +681,8 @@ display: inline-block;"
                             $file->get_id(),
                             $file->get_content(),
                             $file->get_mimetype(),
-                            $file->get_filename()
+                            $file->get_filename(),
+                            $filters
                         );
                     } else {
                         $agreementwhere = array(
@@ -669,7 +699,8 @@ display: inline-block;"
                         $textid = $apiprovider->send_text(
                             $file->get_content(),
                             $file->get_mimetype(),
-                            $file->get_filename()
+                            $file->get_filename(),
+                            $filters
                         );
                     }
                 }

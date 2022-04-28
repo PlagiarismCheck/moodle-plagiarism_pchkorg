@@ -44,6 +44,7 @@ class plagiarism_pchkorg_config_model {
         if (!array_key_exists($module, $resultmap)) {
             $configs = $DB->get_records('plagiarism_pchkorg_config', array(
                     'cm' => $module,
+                    'name' => 'pchkorg_module_use'
             ));
 
             $enabled = false;
@@ -58,6 +59,42 @@ class plagiarism_pchkorg_config_model {
             }
 
             $resultmap[$module] = $enabled;
+        }
+
+        return $resultmap[$module];
+    }
+
+    /**
+     *
+     * Check if plugin is enable for some specific module.
+     * Result is static.
+     *
+     * @param $module
+     * @return bool
+     */
+    public function get_min_percent_for_module($module) {
+        global $DB;
+
+        static $resultmap = array();
+        // This will be called only once per module.
+        if (!array_key_exists($module, $resultmap)) {
+            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+                'cm' => $module,
+                'name' => 'pchkorg_min_percent'
+            ));
+
+            $minpercent = null;
+            foreach ($configs as $record) {
+                switch ($record->name) {
+                    case 'pchkorg_min_percent':
+                        $minpercent = $record->value;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            $resultmap[$module] = $minpercent;
         }
 
         return $resultmap[$module];
@@ -100,7 +137,7 @@ class plagiarism_pchkorg_config_model {
                     'cm' => 0,
                     'name' => $name,
             ));
-
+            $resultsmap[$name] = null;
             foreach ($records as $record) {
                 $resultsmap[$name] = $record->value;
                 break;
