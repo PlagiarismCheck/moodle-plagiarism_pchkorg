@@ -646,10 +646,14 @@ display: inline-block;"
                             );
                         } else {
                             $textid = $apiprovider->send_text(
+                                $cm->course,
+                                $cm->id,
+                                $moodletextsubmission->id,
+                                $moodletextsubmission->id,
                                 html_to_text($content, 75, false),
                                 'plain/text',
                                 sprintf('%s-submussion.txt', $moodletextsubmission->id),
-                                $filters
+                                $filters,
                             );
                         }
                     }
@@ -697,6 +701,10 @@ display: inline-block;"
                         }
 
                         $textid = $apiprovider->send_text(
+                            $cm->course,
+                            $cm->id,
+                            $moodlesubmission->id,
+                            $file->get_id(),
                             $file->get_content(),
                             $file->get_mimetype(),
                             $file->get_filename(),

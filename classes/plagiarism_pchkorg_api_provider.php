@@ -185,6 +185,7 @@ class plagiarism_pchkorg_api_provider {
         $body .= $this->get_part('language', 'en', $boundary);
         $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
         $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
+        $body .= $this->get_part('lms', 'moodle', $boundary);
         foreach ($filters as $filtername => $filtervalue) {
             $body .= $this->get_part($filtername, $filtervalue, $boundary);
         }
@@ -202,14 +203,32 @@ class plagiarism_pchkorg_api_provider {
      * @param $filename
      * @return |null
      */
-    public function send_text($content, $mime, $filename, $filters = array()) {
+    public function send_text(
+        $cousereid,
+        $assignmentid,
+        $submissionid,
+        $attachmentid,
+        $content,
+        $mime,
+        $filename,
+        $filters = array()) {
 
         $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
         $curl = new curl();
         $response = $curl->post(
                 $this->endpoint . '/api/v1/text',
-                $this->get_body($boundary, $content, $mime, $filename, $filters),
+                $this->get_body(
+                    $boundary,
+                    $cousereid,
+                    $assignmentid,
+                    $submissionid,
+                    $attachmentid,
+                    $content,
+                    $mime,
+                    $filename,
+                    $filters,
+                ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
                         'CURLOPT_FOLLOWLOCATION' => true,
@@ -316,13 +335,28 @@ class plagiarism_pchkorg_api_provider {
      * @param $filename
      * @return string
      */
-    private function get_body($boundary, $content, $mime, $filename, $filters = array()) {
+    private function get_body(
+        $boundary,
+        $cousereid,
+        $assignmentid,
+        $submissionid,
+        $attachmentid,
+        $content,
+        $mime,
+        $filename,
+        $filters = array()
+    ) {
         $eol = "\r\n";
 
         $body = '';
         $body .= $this->get_part('language', 'en', $boundary);
         $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
         $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
+        $body .= $this->get_part('course_id', $cousereid, $boundary);
+        $body .= $this->get_part('assignment_id', $assignmentid, $boundary);
+        $body .= $this->get_part('submission_id', $submissionid, $boundary);
+        $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
+        $body .= $this->get_part('lms', 'moodle', $boundary);
         foreach ($filters as $filtername => $filtervalue) {
             $body .= $this->get_part($filtername, $filtervalue, $boundary);
         }
