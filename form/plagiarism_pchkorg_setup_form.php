@@ -23,12 +23,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-
-//function pchkorg_check_pchkorg_min_percent($value)
-//{
-//    return 0 <= $value && $value < 100;
-//}
-
 /**
  * Class defined plugin settings form.
  */
@@ -55,6 +49,18 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         if (!isset($mform->exportValues()['pchkorg_use']) || is_null($mform->exportValues()['pchkorg_use'])) {
             $mform->setDefault('pchkorg_use', false);
         }
+        if (!isset($mform->exportValues()['pchkorg_exclude_self_plagiarism'])
+            || is_null($mform->exportValues()['pchkorg_exclude_self_plagiarism'])) {
+            $mform->setDefault('pchkorg_exclude_self_plagiarism', 1);
+        }
+        if (!isset($mform->exportValues()['pchkorg_include_referenced'])
+            || is_null($mform->exportValues()['pchkorg_include_referenced'])) {
+            $mform->setDefault('pchkorg_include_referenced', 0);
+        }
+        if (!isset($mform->exportValues()['pchkorg_include_citation'])
+            || is_null($mform->exportValues()['pchkorg_include_citation'])) {
+            $mform->setDefault('pchkorg_include_citation', 0);
+        }
 
         $mform->addElement('password', 'pchkorg_token', get_string('pchkorg_token', 'plagiarism_pchkorg'));
         $mform->addHelpButton('pchkorg_token', 'pchkorg_token', 'plagiarism_pchkorg');
@@ -74,6 +80,26 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->addRule('pchkorg_min_percent', get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'), 'check_pchkorg_min_percent');
         $mform->setType('pchkorg_min_percent', PARAM_INT);
 
+        $mform->addElement(
+            'select',
+            'pchkorg_exclude_self_plagiarism',
+            get_string('pchkorg_exclude_self_plagiarism', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+
+        $mform->addElement(
+            'select',
+            'pchkorg_include_referenced',
+            get_string('pchkorg_include_referenced', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+
+        $mform->addElement(
+            'select',
+            'pchkorg_include_citation',
+            get_string('pchkorg_include_citation', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
 
         $this->add_action_buttons(true);
     }
