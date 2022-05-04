@@ -193,7 +193,9 @@ class plagiarism_pchkorg_api_provider {
         $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
         $body .= $this->get_part('lms', 'moodle', $boundary);
         foreach ($filters as $filtername => $filtervalue) {
-            $body .= $this->get_part($filtername, $filtervalue, $boundary);
+            if ($filtervalue !== null) {
+                $body .= $this->get_part($filtername, $filtervalue, $boundary);
+            }
         }
         $body .= $this->get_file_part('content', $content, $mime, $filename, $boundary);
         $body .= '--' . $boundary . '--' . $eol;
@@ -380,7 +382,9 @@ class plagiarism_pchkorg_api_provider {
         $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
         $body .= $this->get_part('lms', 'moodle', $boundary);
         foreach ($filters as $filtername => $filtervalue) {
-            $body .= $this->get_part($filtername, $filtervalue, $boundary);
+            if ($filtervalue !== null) {
+                $body .= $this->get_part($filtername, $filtervalue, $boundary);
+            }
         }
         $body .= $this->get_file_part('text', $content, $mime, $filename, $boundary);
         $body .= '--' . $boundary . '--' . $eol;
