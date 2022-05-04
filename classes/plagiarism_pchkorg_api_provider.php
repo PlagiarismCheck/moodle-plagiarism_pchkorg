@@ -84,6 +84,7 @@ class plagiarism_pchkorg_api_provider {
      * @param $authorhash
      * @param $cousereid
      * @param $assignmentid
+     * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
      * @param $content
@@ -96,6 +97,7 @@ class plagiarism_pchkorg_api_provider {
         $authorhash,
         $cousereid,
         $assignmentid,
+        $assignmentname,
         $submissionid,
         $attachmentid,
         $content,
@@ -114,6 +116,7 @@ class plagiarism_pchkorg_api_provider {
                         $authorhash,
                         $cousereid,
                         $assignmentid,
+                        $assignmentname,
                         $submissionid,
                         $attachmentid,
                         $content,
@@ -153,6 +156,7 @@ class plagiarism_pchkorg_api_provider {
      * @param $authorhash
      * @param $cousereid
      * @param $assignmentid
+     * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
      * @param $content
@@ -165,6 +169,7 @@ class plagiarism_pchkorg_api_provider {
         $authorhash,
         $cousereid,
         $assignmentid,
+        $assignmentname,
         $submissionid,
         $attachmentid,
         $content,
@@ -179,6 +184,7 @@ class plagiarism_pchkorg_api_provider {
         $body .= $this->get_part('hash', $authorhash, $boundary);
         $body .= $this->get_part('course_id', $cousereid, $boundary);
         $body .= $this->get_part('assignment_id', $assignmentid, $boundary);
+        $body .= $this->get_part('assignment_name', $assignmentname, $boundary);
         $body .= $this->get_part('submission_id', $submissionid, $boundary);
         $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
         $body .= $this->get_part('filename', $filename, $boundary);
@@ -196,16 +202,24 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
-     * Send text to the service for check.
+     * Send text for originality check.
      *
+     * @param $authorhash
+     * @param $cousereid
+     * @param $assignmentid
+     * @param $assignmentname
+     * @param $submissionid
+     * @param $attachmentid
      * @param $content
      * @param $mime
      * @param $filename
+     *
      * @return |null
      */
     public function send_text(
         $cousereid,
         $assignmentid,
+        $assignmentname,
         $submissionid,
         $attachmentid,
         $content,
@@ -222,6 +236,7 @@ class plagiarism_pchkorg_api_provider {
                     $boundary,
                     $cousereid,
                     $assignmentid,
+                    $assignmentname,
                     $submissionid,
                     $attachmentid,
                     $content,
@@ -327,9 +342,14 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
-     * Build body for http-request.
+     * Build HTTP body of request.
      *
      * @param $boundary
+     * @param $cousereid
+     * @param $assignmentid
+     * @param $assignmentname
+     * @param $submissionid
+     * @param $attachmentid
      * @param $content
      * @param $mime
      * @param $filename
@@ -339,6 +359,7 @@ class plagiarism_pchkorg_api_provider {
         $boundary,
         $cousereid,
         $assignmentid,
+        $assignmentname,
         $submissionid,
         $attachmentid,
         $content,
@@ -354,6 +375,7 @@ class plagiarism_pchkorg_api_provider {
         $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
         $body .= $this->get_part('course_id', $cousereid, $boundary);
         $body .= $this->get_part('assignment_id', $assignmentid, $boundary);
+        $body .= $this->get_part('assignment_name', $assignmentname, $boundary);
         $body .= $this->get_part('submission_id', $submissionid, $boundary);
         $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
         $body .= $this->get_part('lms', 'moodle', $boundary);

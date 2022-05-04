@@ -66,13 +66,13 @@ class plagiarism_pchkorg_config_model {
 
     /**
      *
-     * Check if plugin is enable for some specific module.
-     * Result is static.
+     * Get value for search setting
      *
      * @param $module
+     * @param $name
      * @return bool
      */
-    public function get_min_percent_for_module($module) {
+    public function get_filter_for_module($module, $name) {
         global $DB;
 
         static $resultmap = array();
@@ -80,21 +80,17 @@ class plagiarism_pchkorg_config_model {
         if (!array_key_exists($module, $resultmap)) {
             $configs = $DB->get_records('plagiarism_pchkorg_config', array(
                 'cm' => $module,
-                'name' => 'pchkorg_min_percent'
+                'name' => $name
             ));
 
-            $minpercent = null;
+            $value = null;
             foreach ($configs as $record) {
-                switch ($record->name) {
-                    case 'pchkorg_min_percent':
-                        $minpercent = $record->value;
-                        break;
-                    default:
-                        break;
+                if ($record->name === $name) {
+                    $value = $record->value;
                 }
             }
 
-            $resultmap[$module] = $minpercent;
+            $resultmap[$module] = $value;
         }
 
         return $resultmap[$module];

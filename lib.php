@@ -285,15 +285,24 @@ display: inline-block;"
             $cm = optional_param('update', $defaultcmid, PARAM_INT);
             $minpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
 
+            if (!isset($mform->exportValues()['pchkorg_exclude_self_plagiarism'])
+                || is_null($mform->exportValues()['pchkorg_exclude_self_plagiarism'])) {
+                $mform->setDefault('pchkorg_exclude_self_plagiarism', 1);
+            }
+            if (!isset($mform->exportValues()['pchkorg_include_referenced'])
+                || is_null($mform->exportValues()['pchkorg_include_referenced'])) {
+                $mform->setDefault('pchkorg_include_referenced', 0);
+            }
+            if (!isset($mform->exportValues()['pchkorg_include_citation'])
+                || is_null($mform->exportValues()['pchkorg_include_citation'])) {
+                $mform->setDefault('pchkorg_include_citation', 0);
+            }
+
             if (null === $cm) {
                 if (!isset($mform->exportValues()['pchkorg_module_use'])
                     || is_null($mform->exportValues()['pchkorg_module_use'])) {
                     $mform->setDefault('pchkorg_module_use', '1');
                 }
-//                if (!isset($mform->exportValues()['pchkorg_min_percent'])
-//                    || is_null($mform->exportValues()['pchkorg_min_percent'])) {
-//                    $mform->setDefault('pchkorg_min_percent', $minpercent);
-//                }
             } else {
                 $records = $DB->get_records('plagiarism_pchkorg_config', array(
                     'cm' => $cm,
@@ -348,6 +357,27 @@ display: inline-block;"
                 'check_pchkorg_min_percent'
             );
             $mform->setType('pchkorg_min_percent', PARAM_INT);
+
+            $mform->addElement(
+                'select',
+                'pchkorg_exclude_self_plagiarism',
+                get_string('pchkorg_exclude_self_plagiarism', 'plagiarism_pchkorg'),
+                array(get_string('no'), get_string('yes'))
+            );
+
+            $mform->addElement(
+                'select',
+                'pchkorg_include_referenced',
+                get_string('pchkorg_include_referenced', 'plagiarism_pchkorg'),
+                array(get_string('no'), get_string('yes'))
+            );
+
+            $mform->addElement(
+                'select',
+                'pchkorg_include_citation',
+                get_string('pchkorg_include_citation', 'plagiarism_pchkorg'),
+                array(get_string('no'), get_string('yes'))
+            );
         }
     }
 
@@ -617,13 +647,26 @@ display: inline-block;"
                 // Filter for future search.
                 $systemminpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
                 // Module filter value has a bigger priority then system config value.
-                $moduleminpercent = $pchkorgconfigmodel->get_min_percent_for_module($cm->id);
+                $moduleminpercent = $pchkorgconfigmodel->get_filter_for_module($cm->id, 'source_min_percent');
                 if ($moduleminpercent) {
                     $minpercent = $moduleminpercent;
                 } else {
                     $minpercent = $systemminpercent;
                 }
-                $filters = [];
+                $filters = [
+                    'include_references' => $pchkorgconfigmodel->get_filter_for_module(
+                        $cm->id,
+                        'include_references'
+                    ),
+                    'include_quotes' => $pchkorgconfigmodel->get_filter_for_module(
+                        $cm->id,
+                        'include_quotes'
+                    ),
+                    'exclude_self_plagiarism' => $pchkorgconfigmodel->get_filter_for_module(
+                        $cm->id,
+                        'exclude_self_plagiarism'
+                    ),
+                ];
                 if ($minpercent) {
                     $filters['source_min_percent'] = $minpercent;
                 }
@@ -637,6 +680,7 @@ display: inline-block;"
                                 $apiprovider->user_email_to_hash($user->email),
                                 $cm->course,
                                 $cm->id,
+                                $cm->name,
                                 $moodletextsubmission->id,
                                 $moodletextsubmission->id,
                                 html_to_text($content, 75, false),
@@ -648,6 +692,7 @@ display: inline-block;"
                             $textid = $apiprovider->send_text(
                                 $cm->course,
                                 $cm->id,
+                                $cm->name,
                                 $moodletextsubmission->id,
                                 $moodletextsubmission->id,
                                 html_to_text($content, 75, false),
@@ -681,6 +726,7 @@ display: inline-block;"
                             $apiprovider->user_email_to_hash($user->email),
                             $cm->course,
                             $cm->id,
+                            $cm->name,
                             $moodlesubmission->id,
                             $file->get_id(),
                             $file->get_content(),
@@ -703,6 +749,7 @@ display: inline-block;"
                         $textid = $apiprovider->send_text(
                             $cm->course,
                             $cm->id,
+                            $cm->name,
                             $moodlesubmission->id,
                             $file->get_id(),
                             $file->get_content(),
