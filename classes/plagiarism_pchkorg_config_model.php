@@ -75,25 +75,20 @@ class plagiarism_pchkorg_config_model {
     public function get_filter_for_module($module, $name) {
         global $DB;
 
-        static $resultmap = array();
-        // This will be called only once per module.
-        if (!array_key_exists($module, $resultmap)) {
-            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
-                'cm' => $module,
-                'name' => $name
-            ));
+        $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+            'cm' => $module,
+            'name' => $name,
+        ));
 
-            $value = null;
-            foreach ($configs as $record) {
-                if ($record->name === $name) {
-                    $value = $record->value;
-                }
+        $value = null;
+        foreach ($configs as $record) {
+            if ($record->name === $name) {
+                $value = $record->value;
+                break;
             }
-
-            $resultmap[$module] = $value;
         }
 
-        return $resultmap[$module];
+        return $value;
     }
 
     /**
