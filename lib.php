@@ -215,7 +215,13 @@ display: inline-block;"
             return;
         }
 
-        $fields = array('pchkorg_module_use', 'pchkorg_min_percent');
+        $fields = array(
+            'pchkorg_module_use',
+            'pchkorg_min_percent',
+            'pchkorg_include_citation',
+            'pchkorg_include_referenced',
+            'pchkorg_exclude_self_plagiarism'
+        );
 
         $records = $DB->get_records('plagiarism_pchkorg_config', array(
             'cm' => $data->coursemodule
@@ -647,7 +653,7 @@ display: inline-block;"
                 // Filter for future search.
                 $systemminpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
                 // Module filter value has a bigger priority then system config value.
-                $moduleminpercent = $pchkorgconfigmodel->get_filter_for_module($cm->id, 'source_min_percent');
+                $moduleminpercent = $pchkorgconfigmodel->get_filter_for_module($cm->id, 'pchkorg_min_percent');
                 if ($moduleminpercent) {
                     $minpercent = $moduleminpercent;
                 } else {
@@ -656,15 +662,15 @@ display: inline-block;"
                 $filters = [
                     'include_references' => $pchkorgconfigmodel->get_filter_for_module(
                         $cm->id,
-                        'include_references'
+                        'pchkorg_include_referenced'
                     ),
                     'include_quotes' => $pchkorgconfigmodel->get_filter_for_module(
                         $cm->id,
-                        'include_quotes'
+                        'pchkorg_include_citation'
                     ),
                     'exclude_self_plagiarism' => $pchkorgconfigmodel->get_filter_for_module(
                         $cm->id,
-                        'exclude_self_plagiarism'
+                        'pchkorg_exclude_self_plagiarism'
                     ),
                 ];
                 if ($minpercent) {
