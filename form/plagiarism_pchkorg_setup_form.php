@@ -68,6 +68,20 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->addRule('pchkorg_min_percent', get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'), 'check_pchkorg_min_percent');
         $mform->setType('pchkorg_min_percent', PARAM_INT);
 
+        $mform->addElement(
+            'select',
+            'pchkorg_enable_quiz',
+            get_string('pchkorg_enable_quiz', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+
+        $mform->addElement(
+            'select',
+            'pchkorg_enable_forum',
+            get_string('pchkorg_enable_forum', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+
         $this->add_action_buttons(true);
     }
 

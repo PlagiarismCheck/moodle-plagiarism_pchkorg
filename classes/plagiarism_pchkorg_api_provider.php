@@ -93,6 +93,61 @@ class plagiarism_pchkorg_api_provider {
      *
      * @return |null
      */
+    public function general_send_check(
+        $authorhash,
+        $cousereid,
+        $assignmentid,
+        $assignmentname,
+        $submissionid,
+        $attachmentid,
+        $content,
+        $mime,
+        $filename,
+        $filters = array()
+    ) {
+        if ($this->is_group_token()) {
+            return $this->send_group_text(
+                $authorhash,
+                $cousereid,
+                $assignmentid,
+                $assignmentname,
+                $submissionid,
+                $attachmentid,
+                $content,
+                $mime,
+                $filename,
+                $filters
+            );
+        } else {
+            return $this->send_text(
+                $cousereid,
+                $assignmentid,
+                $assignmentname,
+                $submissionid,
+                $attachmentid,
+                $content,
+                $mime,
+                $filename,
+                $filters
+            );
+        }
+    }
+
+    /**
+     * Send text for originality check.
+     *
+     * @param $authorhash
+     * @param $cousereid
+     * @param $assignmentid
+     * @param $assignmentname
+     * @param $submissionid
+     * @param $attachmentid
+     * @param $content
+     * @param $mime
+     * @param $filename
+     *
+     * @return |null
+     */
     public function send_group_text(
         $authorhash,
         $cousereid,
