@@ -26,7 +26,7 @@ namespace plagiarism_pchkorg\task;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Send queued submissions to Turnitin.
+ * Send queued submissions.
  */
 class send_submissions extends \core\task\scheduled_task {
 

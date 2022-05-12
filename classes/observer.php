@@ -85,4 +85,32 @@ class plagiarism_pchkorg_observer {
         $plugin = new plagiarism_plugin_pchkorg();
         $plugin->event_handler($eventdata);
     }
+
+    /**
+     * Handle the quiz attempt_submitted event.
+     * @param \mod_quiz\event\attempt_submitted $event
+     */
+    public static function quiz_submitted(
+        \mod_quiz\event\attempt_submitted $event) {
+        $eventdata = $event->get_data();
+        $eventdata['eventtype'] = 'quiz_submitted';
+        $eventdata['other']['modulename'] = 'quiz';
+
+        $plugin = new plagiarism_plugin_pchkorg();
+        $plugin->event_handler($eventdata);
+    }
+
+    /**
+     * Handle the quiz attempt_updated event.
+     * @param \mod_quiz\event\attempt_updated $event
+     */
+    public static function quiz_updated(
+        \mod_quiz\event\attempt_submitted $event) {
+        $eventdata = $event->get_data();
+        $eventdata['eventtype'] = 'quiz_submitted';
+        $eventdata['other']['modulename'] = 'quiz';
+
+        $plugin = new plagiarism_plugin_pchkorg();
+        $plugin->event_handler($eventdata);
+    }
 }

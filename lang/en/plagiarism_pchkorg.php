@@ -42,6 +42,7 @@ $string['pchkorg_min_percent_range'] = 'Must be between 0 and 99';
 $string['pchkorg_exclude_self_plagiarism'] = 'Exclude self-plagiarism';
 $string['pchkorg_include_referenced'] = 'Include References';
 $string['pchkorg_include_citation'] = 'Include Quotes';
+$string['pchkorg_enable_quiz'] = 'Enable Quiz';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>

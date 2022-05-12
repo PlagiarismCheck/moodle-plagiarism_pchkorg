@@ -40,4 +40,12 @@ $observers = array (
         'eventname' => '\core\event\course_module_deleted',
         'callback'  => 'plagiarism_pchkorg_observer::course_module_deleted'
     ),
+    array(
+        'eventname' => '\mod_quiz\event\attempt_submitted',
+        'callback'  => 'plagiarism_pchkorg_observer::quiz_submitted',
+    ),
+    array(
+        'eventname' => '\mod_quiz\event\attempt_updated',
+        'callback'  => 'plagiarism_pchkorg_observer::quiz_updated',
+    )
 );

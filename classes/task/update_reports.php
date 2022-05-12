@@ -26,7 +26,7 @@ namespace plagiarism_pchkorg\task;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Update report Scores from Turnitin.
+ * Update report.
  */
 class update_reports extends \core\task\scheduled_task {
 
