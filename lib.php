@@ -52,10 +52,12 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
     $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
 
     $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
-    $isquizenabled = '1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_quiz');
     $enabled = has_capability(capability::ENABLE, $context);
-    if ($isquizenabled) {
+    if ( '1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_quiz')) {
         $allowedmodules[] = 'quiz';
+    }
+    if ( '1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_forum')) {
+        $allowedmodules[] = 'forum';
     }
     if ('1' == $config && $enabled) {
         if (!in_array($modulename, $allowedmodules, true)) {
@@ -165,9 +167,6 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
 
 }
 
-
-
-
 /**
  * Class plagiarism_plugin_pchkorg
  */
@@ -206,9 +205,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         if ('1' !== $config) {
             return '';
         }
-
         $context = null;
-
         $component = !empty($linkarray['component']) ? $linkarray['component'] : '';
         if ($cmid === null && $component == 'qtype_essay' && !empty($linkarray['area'])) {
             $questions = question_engine::load_questions_usage_by_activity($linkarray['area']);
@@ -237,7 +234,6 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             return '';
         }
 
-
         // Only for some type of account, method will call a remote HTTP API.
         // The API will be called only once, because result is static.
         // Also, there is timeout 2 seconds for response.
@@ -260,9 +256,15 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         } else {
             $where->fileid = $file->get_id();
         }
-
         $filerecords = $DB->get_records('plagiarism_pchkorg_files', (array) $where,
             'id', '*', 0, 1);
+
+        if (!$filerecords && $file === null) {
+            $where->signature = sha1(trim(strip_tags($linkarray['content'])));
+            $where->fileid = null;
+            $filerecords = $DB->get_records('plagiarism_pchkorg_files', (array) $where,
+                'id', '*', 0, 1);
+        }
 
         if ($filerecords) {
             $filerecord = end($filerecords);
@@ -287,7 +289,21 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 } else {
                     $color = '#f04343';
                 }
-                $PAGE->requires->js_amd_inline("
+                $jsdata = array(
+                    'id' => $filerecord->id,
+                    'title' => $title,
+                    'action' => $action,
+                    'token' => $reporttoken,
+                    'image' => $imgsrc,
+                    'label' => $label,
+                    'color' => $color
+                );
+                static $isjsfuncinjected = false;
+                if (!$isjsfuncinjected) {
+                    $isjsfuncinjected = true;
+                    $PAGE->requires->js_amd_inline(
+                        "
+window.plagiarism_check_data = [];
 window.plagiarism_check_full_report = function (action, token) {
     const form = document.createElement('form');
     const element1 = document.createElement('input');
@@ -311,23 +327,56 @@ window.plagiarism_check_full_report = function (action, token) {
     
     form.submit();
 };
-                ");
+window.onload = function () { 
+        var spans = window.document.getElementsByClassName('plagiarism-pchkorg-widget');
+        for (var span of spans) {
+            for (var classname of span.classList) {
+                if (classname.includes('plagiarism-pchkorg-widget-id-')) {
+                    var id = classname.replace('plagiarism-pchkorg-widget-id-', '');
+                    if (id) {
+                        for (var data of window.plagiarism_check_data) {
+                            if (data.id == id) {
+                                var a = document.createElement('a');
+                                a.setAttribute('href', '#');
+                                a.setAttribute('title', data.title);
+                                a.style.padding = '5px 3px';
+                                a.style.textDecoration = 'none';
+                                a.style.backgroundColor = data.color;
+                                a.style.color = 'black';
+                                a.style.cursor = 'pointer';
+                                a.style.borderRadius = '3px 3px 3px 3px';
+                                a.style.margin = '4px';
+                                a.style.display = 'inline-block';
+                                a.onclick = function() { 
+                                    window.plagiarism_check_full_report(data.action, data.token); 
+                                    return false;
+                                };
+                                var label = document.createTextNode(data.label);
+                                var img = document.createElement('img');
+                                img.setAttribute('alt', 'PlagiarismCheck.org');
+                                img.setAttribute('src', data.image);
+                                img.setAttribute('width', '20');
+                                a.appendChild(img);
+                                a.appendChild(label);
+                                span.appendChild(a);
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+}
+                "
+                    );
+                }
+
+                $PAGE->requires->js_amd_inline("window.plagiarism_check_data.push(".json_encode($jsdata).")");
+
 
                 return '
-                <a style="padding: 5px 3px;
-text-decoration: none;
-background-color: ' . $color . ';
-color: black;
-cursor: pointer;
-border-radius: 3px 3px 3px 3px;
-margin: 4px;
-display: inline-block;"
-            href="#" title="' . $title . '"
-            class="plagiarism_pchkorg_report_id_score"
-            onclick="window.plagiarism_check_full_report(\''.$action.'\', \''.$reporttoken.'\'); return false;">
-            <img src="' . $imgsrc . '" alt="logo" width="20px;" />
-            ' . $label . '
-            </a>';
+                <span class="plagiarism-pchkorg-widget plagiarism-pchkorg-widget-id-'.$filerecord->id.'"></span>';
             } else if ($filerecord->state == 10) {
                 $label = get_string('pchkorg_label_queued', 'plagiarism_pchkorg');
                 return '
@@ -339,7 +388,7 @@ border-radius: 3px 3px 3px 3px;
 margin: 4px;
 display: inline-block;"
             href="#" class="plagiarism_pchkorg_report_id_score">
-                <img src="' . $imgsrc . '" alt="logo" width="20px;" />
+                <img src="' . $imgsrc . '" alt="logo" width="20" />
                 ' . $label . '
             </span>';
             } else if ($filerecord->state == 12) {
@@ -353,7 +402,7 @@ border-radius: 3px 3px 3px 3px;
 margin: 4px;
 display: inline-block;"
             href="#" class="plagiarism_pchkorg_report_id_score">
-                <img src="' . $imgsrc . '" alt="logo" width="20px;" />
+                <img src="' . $imgsrc . '" alt="logo" width="20" />
                 ' . $label . '
             </span>';
             }
@@ -448,14 +497,16 @@ display: inline-block;"
 
         $configmodel = new plagiarism_pchkorg_config_model();
         $enabled = $configmodel->get_system_config('pchkorg_use');
-        $isquizenabled = '1' === $configmodel->get_system_config('pchkorg_enable_quiz');
         if ($enabled !== '1') {
             return '';
         }
         $modulename = $cm->modname;
         $allowedmodules = array('assign', 'mod_assign');
-        if ($isquizenabled) {
+        if ($configmodel->get_system_config('pchkorg_enable_quiz')) {
             $allowedmodules[] = 'quiz';
+        }
+        if ($configmodel->get_system_config('pchkorg_enable_forum')) {
+            $allowedmodules[] = 'forum';
         }
         if (!in_array($modulename, $allowedmodules, true)) {
             return '';
@@ -499,19 +550,22 @@ display: inline-block;"
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
         // Token is needed for API auth.
         $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
-        $isquizenabled = '1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_quiz');
         $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
         // SQL will be called only once, result is static.
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' !== $config) {
             return true;
         }
-        if ($isquizenabled) {
+        if ('1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_quiz')) {
             $allowedmodules[] = 'quiz';
+        }
+        if ('1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_forum')) {
+            $allowedmodules[] = 'forum';
         }
         if (!in_array($modulename, $allowedmodules, true)) {
             return true;
         }
+
         // Receive couser moudle id.
         $cmid = $eventdata['contextinstanceid'];
         // Remove the event if the course module no longer exists.
@@ -550,6 +604,82 @@ display: inline-block;"
             }
         }
 
+        if ($eventdata['other']['modulename'] === 'forum'
+            && $eventdata['eventtype'] === 'forum_attachment') {
+            if (!empty($eventdata['other']['content'])) {
+                $content = trim(strip_tags($eventdata['other']['content']));
+                if (strlen($content) > 80) {
+                    $signature = sha1($content);
+                    $filesconditions = array(
+                        'signature' => $signature,
+                        'cm' => $cmid,
+                        'userid' => $USER->id,
+                        'itemid' => $eventdata['objectid']
+                    );
+                    $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
+                    if (!$oldfile) {
+                        $filerecord = new \stdClass();
+                        $filerecord->fileid = null;
+                        $filerecord->cm = $cmid;
+                        $filerecord->userid = $USER->id;
+                        $filerecord->textid = null;
+                        $filerecord->state = 10;
+                        $filerecord->created_at = time();
+                        $filerecord->itemid = $eventdata['objectid'];
+                        $filerecord->signature = $signature;
+
+                        $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
+                    }
+                }
+            }
+            if (!empty($eventdata['other']['pathnamehashes'])) {
+                foreach ($eventdata['other']['pathnamehashes'] as $pathnamehash) {
+                    $file = get_file_storage()->get_file_by_hash($pathnamehash);
+                    if (!$file) {
+                        // We can not find file so we do not send it in queue.
+                        continue;
+                    } else {
+                        try {
+                            // Check that we can fetch content without exception.
+                            $content = $file->get_content();
+                        } catch (Exception $e) {
+                            // No we can not.
+                            continue;
+                        }
+                    }
+                    if ($file->get_filename() === '.') {
+                        continue;
+                    }
+                    $filemime = $file->get_mimetype();
+
+                    // File type is not supported.
+                    if (!$apiprovider->is_supported_mime($filemime)) {
+                        continue;
+                    }
+                    $signature = sha1($content);
+                    $filesconditions = array(
+                        'fileid' => $file->get_id()
+                    );
+                    $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
+                    if (!$oldfile) {
+                        $filerecord = new \stdClass();
+                        $filerecord->fileid = $file->get_id();
+                        $filerecord->cm = $cmid;
+                        $filerecord->userid = $USER->id;
+                        $filerecord->textid = null;
+                        $filerecord->state = 10;
+                        $filerecord->created_at = time();
+                        $filerecord->itemid = $eventdata['objectid'];
+                        $filerecord->signature = $signature;
+
+                        $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
+                    }
+                }
+            }
+
+            return true;
+        }
+
         if ($eventdata['other']['modulename'] === 'quiz'
             && $eventdata['eventtype'] === 'quiz_submitted') {
 
@@ -558,36 +688,76 @@ display: inline-block;"
                 $questionattempt = $attempt->get_question_attempt($slot);
                 $qtype = $questionattempt->get_question()->qtype;
                 if ($qtype instanceof qtype_essay) {
+                    $attachments = $questionattempt->get_last_qt_files('attachments', $eventdata['contextid']);
                     $content = $questionattempt->get_response_summary();
-                    if (strlen($content) < 80) {
-                        continue;
+                    if (strlen($content) > 80) {
+                        $signature = sha1($content);
+                        $filesconditions = array(
+                            'signature' => $signature,
+                            'cm' => $cmid,
+                            'userid' => $USER->id,
+                            'itemid' => $eventdata['objectid']
+                        );
+
+                        $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
+                        if ($oldfile) {
+                            // There is the same check in database, so we can skip this one.
+                            return true;
+                        }
+
+                        $filerecord = new \stdClass();
+                        $filerecord->fileid = null;
+                        $filerecord->cm = $cmid;
+                        $filerecord->userid = $USER->id;
+                        $filerecord->textid = null;
+                        $filerecord->state = 10;
+                        $filerecord->created_at = time();
+                        $filerecord->itemid = $eventdata['objectid'];
+                        $filerecord->signature = $signature;
+
+                        $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                     }
-                    $signature = sha1($content);
+                    foreach ($attachments as $pathnamehash => $file) {
+                        if (!$file) {
+                            // We can not find file so we do not send it in queue.
+                            continue;
+                        } else {
+                            try {
+                                // Check that we can fetch content without exception.
+                                $content = $file->get_content();
+                            } catch (Exception $e) {
+                                // No we can not.
+                                continue;
+                            }
+                        }
+                        if ($file->get_filename() === '.') {
+                            continue;
+                        }
+                        $filemime = $file->get_mimetype();
 
-                    $filesconditions = array(
-                        'signature' => $signature,
-                        'cm' => $cmid,
-                        'userid' => $USER->id,
-                        'itemid' => $eventdata['objectid']
-                    );
+                        // File type is not supported.
+                        if (!$apiprovider->is_supported_mime($filemime)) {
+                            continue;
+                        }
+                        $signature = sha1($content);
+                        $filesconditions = array(
+                            'fileid' => $file->get_id()
+                        );
+                        $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
+                        if (!$oldfile) {
+                            $filerecord = new \stdClass();
+                            $filerecord->fileid = $file->get_id();
+                            $filerecord->cm = $cmid;
+                            $filerecord->userid = $USER->id;
+                            $filerecord->textid = null;
+                            $filerecord->state = 10;
+                            $filerecord->created_at = time();
+                            $filerecord->itemid = $eventdata['objectid'];
+                            $filerecord->signature = $signature;
 
-                    $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
-                    if ($oldfile) {
-                        // There is the same check in database, so we can skip this one.
-                        return true;
+                            $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
+                        }
                     }
-
-                    $filerecord = new \stdClass();
-                    $filerecord->fileid = null;
-                    $filerecord->cm = $cmid;
-                    $filerecord->userid = $USER->id;
-                    $filerecord->textid = null;
-                    $filerecord->state = 10;
-                    $filerecord->created_at = time();
-                    $filerecord->itemid = $eventdata['objectid'];
-                    $filerecord->signature = $signature;
-
-                    $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                 }
             }
         }
@@ -659,7 +829,8 @@ display: inline-block;"
 
         // Queue text content to send to plagiarismcheck.org.
         // If there was an error when creating the assignment then still queue the submission so it can be saved as failed.
-        if (in_array($eventdata['eventtype'], array("content_uploaded", "assessable_submitted"))
+        if ($eventdata['other']['modulename'] === 'assign'
+            && in_array($eventdata['eventtype'], array("content_uploaded", "assessable_submitted"))
             && !empty($eventdata['other']['content'])) {
 
             $signature = sha1($eventdata['other']['content']);
@@ -790,8 +961,9 @@ display: inline-block;"
                     $apiprovider->save_accepted_agreement($user->email);
                     $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
                 }
-                if ($filedb->fileid === null) {
-                    if ($cm->modname === 'quiz') {
+
+                if ($cm->modname === 'quiz') {
+                    if ($filedb->fileid === null) {
                         $questionanswers = $DB->get_records_sql(
                             "SELECT {question_attempts}.responsesummary "
                             ." FROM {question_attempts} "
@@ -821,6 +993,110 @@ display: inline-block;"
                             }
                         }
                     } else {
+                        $file = $fs->get_file_by_id($filedb->fileid);
+                        // We can not receive file by id.
+                        // Maybe file does not exist anymore.
+                        // So we mark it as error and continue.
+                        if (!$file || !is_object($file)) {
+                            $filedbnew = new stdClass();
+                            $filedbnew->id = $filedb->id;
+                            $filedbnew->attempt = $filedb->attempt + 1;
+                            $filedbnew->state = 11; // Sending error.
+
+                            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+
+                            continue;
+                        }
+                        $textid = $apiprovider->general_send_check(
+                            $apiprovider->user_email_to_hash($user->email),
+                            $cm->course,
+                            $cm->id,
+                            $cm->name,
+                            $filedb->itemid,
+                            $file->get_id(),
+                            $file->get_content(),
+                            $file->get_mimetype(),
+                            $file->get_filename(),
+                            $filters
+                        );
+                    }
+                }
+                if ($cm->modname === 'forum') {
+                    if ($filedb->fileid === null) {
+                        $post = $DB->get_record_sql(
+                            "SELECT subject, message"
+                            ." FROM {forum_posts}"
+                            ." WHERE {forum_posts}.id = ?", array(
+                                $filedb->itemid
+                            )
+                        );
+                        if ($post) {
+                            $subject = $post->subject;
+                            $content = $post->message;
+                            $signature = sha1($content);
+                            $ismatched = false;
+                            if ($signature === $filedb->signature) {
+                                $ismatched = true;
+                            }
+                            if (!$ismatched) {
+                                $signature = sha1(trim(strip_tags($content)));
+                                if ($signature === $filedb->signature) {
+                                    $ismatched = true;
+                                }
+                            }
+
+                            if ($ismatched) {
+                                $textid = $apiprovider->general_send_check(
+                                    $apiprovider->user_email_to_hash($user->email),
+                                    $cm->course,
+                                    $cm->id,
+                                    $cm->name,
+                                    $subject,
+                                    null,
+                                    html_to_text($content, 75, false),
+                                    'plain/text',
+                                    sprintf('%s-quiz.txt', $filedb->itemid),
+                                    $filters,
+                                );
+                            }
+                        }
+                    } else {
+                        $moodlesubmission = $DB->get_record('assign_submission', array(
+                            'assignment' => $cm->instance,
+                            'userid' => $filedb->userid,
+                            'id' => $filedb->itemid,
+                        ), 'id');
+                        $file = $fs->get_file_by_id($filedb->fileid);
+
+                        // We can not receive file by id.
+                        // Maybe file does not exist anymore.
+                        // So we mark it as error and continue.
+                        if (!$file || !is_object($file)) {
+                            $filedbnew = new stdClass();
+                            $filedbnew->id = $filedb->id;
+                            $filedbnew->attempt = $filedb->attempt + 1;
+                            $filedbnew->state = 11; // Sending error.
+
+                            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+
+                            continue;
+                        }
+                        $textid = $apiprovider->general_send_check(
+                            $apiprovider->user_email_to_hash($user->email),
+                            $cm->course,
+                            $cm->id,
+                            $cm->name,
+                            $moodlesubmission->id,
+                            $file->get_id(),
+                            $file->get_content(),
+                            $file->get_mimetype(),
+                            $file->get_filename(),
+                            $filters
+                        );
+                    }
+                }
+                if ($cm->modname === 'assign') {
+                    if ($filedb->fileid === null) {
                         $moodletextsubmission = $DB->get_record(
                             'assignsubmission_onlinetext',
                             array('submission' => $filedb->itemid),
@@ -841,41 +1117,42 @@ display: inline-block;"
                                 $filters,
                             );
                         }
+                    } else {
+                        $moodlesubmission = $DB->get_record('assign_submission', array(
+                            'assignment' => $cm->instance,
+                            'userid' => $filedb->userid,
+                            'id' => $filedb->itemid,
+                        ), 'id');
+                        $file = $fs->get_file_by_id($filedb->fileid);
+
+                        // We can not receive file by id.
+                        // Maybe file does not exist anymore.
+                        // So we mark it as error and continue.
+                        if (!$file || !is_object($file)) {
+                            $filedbnew = new stdClass();
+                            $filedbnew->id = $filedb->id;
+                            $filedbnew->attempt = $filedb->attempt + 1;
+                            $filedbnew->state = 11; // Sending error.
+
+                            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+
+                            continue;
+                        }
+                        $textid = $apiprovider->general_send_check(
+                            $apiprovider->user_email_to_hash($user->email),
+                            $cm->course,
+                            $cm->id,
+                            $cm->name,
+                            $moodlesubmission->id,
+                            $file->get_id(),
+                            $file->get_content(),
+                            $file->get_mimetype(),
+                            $file->get_filename(),
+                            $filters
+                        );
                     }
-                } else {
-                    $moodlesubmission = $DB->get_record('assign_submission', array(
-                        'assignment' => $cm->instance,
-                        'userid' => $filedb->userid,
-                        'id' => $filedb->itemid,
-                    ), 'id');
-                    $file = $fs->get_file_by_id($filedb->fileid);
-
-                    // We can not receive file by id.
-                    // Maybe file does not exist anymore.
-                    // So we mark it as error and continue.
-                    if (!$file || !is_object($file)) {
-                        $filedbnew = new stdClass();
-                        $filedbnew->id = $filedb->id;
-                        $filedbnew->attempt = $filedb->attempt + 1;
-                        $filedbnew->state = 11; // Sending error.
-
-                        $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
-
-                        continue;
-                    }
-                    $textid = $apiprovider->general_send_check(
-                        $apiprovider->user_email_to_hash($user->email),
-                        $cm->course,
-                        $cm->id,
-                        $cm->name,
-                        $moodlesubmission->id,
-                        $file->get_id(),
-                        $file->get_content(),
-                        $file->get_mimetype(),
-                        $file->get_filename(),
-                        $filters
-                    );
                 }
+
                 $filedbnew = new stdClass();
                 $filedbnew->id = $filedb->id;
                 if ($textid) {

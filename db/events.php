@@ -45,7 +45,7 @@ $observers = array (
         'callback'  => 'plagiarism_pchkorg_observer::quiz_submitted',
     ),
     array(
-        'eventname' => '\mod_quiz\event\attempt_updated',
-        'callback'  => 'plagiarism_pchkorg_observer::quiz_updated',
-    )
+        'eventname' => '\mod_forum\event\assessable_uploaded',
+        'callback'  => 'plagiarism_pchkorg_observer::forum_assessable_uploaded',
+    ),
 );

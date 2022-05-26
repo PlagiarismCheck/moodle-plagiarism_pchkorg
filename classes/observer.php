@@ -101,14 +101,15 @@ class plagiarism_pchkorg_observer {
     }
 
     /**
-     * Handle the quiz attempt_updated event.
-     * @param \mod_quiz\event\attempt_updated $event
+     * Handle the forum reply updated event.
+     * @param \mod_forum\event\assessable_uploaded $event
      */
-    public static function quiz_updated(
-        \mod_quiz\event\attempt_submitted $event) {
+    public static function forum_assessable_uploaded(
+        \mod_forum\event\assessable_uploaded$event
+    ) {
         $eventdata = $event->get_data();
-        $eventdata['eventtype'] = 'quiz_submitted';
-        $eventdata['other']['modulename'] = 'quiz';
+        $eventdata['eventtype'] = 'forum_attachment';
+        $eventdata['other']['modulename'] = 'forum';
 
         $plugin = new plagiarism_plugin_pchkorg();
         $plugin->event_handler($eventdata);
