@@ -66,23 +66,26 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
         $defaultcmid = null;
         $cm = optional_param('update', $defaultcmid, PARAM_INT);
         $minpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
-
-        if (!isset($mform->exportValues()['pchkorg_exclude_self_plagiarism'])
-            || is_null($mform->exportValues()['pchkorg_exclude_self_plagiarism'])) {
+        $exportedvalues = $mform->exportValues([]);
+        if (!is_array($exportedvalues)) {
+            $exportedvalues = array();
+        }
+        if (!isset($exportedvalues['pchkorg_exclude_self_plagiarism'])
+            || is_null($exportedvalues['pchkorg_exclude_self_plagiarism'])) {
             $mform->setDefault('pchkorg_exclude_self_plagiarism', 1);
         }
-        if (!isset($mform->exportValues()['pchkorg_include_referenced'])
-            || is_null($mform->exportValues()['pchkorg_include_referenced'])) {
+        if (!isset($exportedvalues['pchkorg_include_referenced'])
+            || is_null($exportedvalues['pchkorg_include_referenced'])) {
             $mform->setDefault('pchkorg_include_referenced', 0);
         }
-        if (!isset($mform->exportValues()['pchkorg_include_citation'])
-            || is_null($mform->exportValues()['pchkorg_include_citation'])) {
+        if (!isset($exportedvalues['pchkorg_include_citation'])
+            || is_null($exportedvalues['pchkorg_include_citation'])) {
             $mform->setDefault('pchkorg_include_citation', 0);
         }
 
         if (null === $cm) {
-            if (!isset($mform->exportValues()['pchkorg_module_use'])
-                || is_null($mform->exportValues()['pchkorg_module_use'])) {
+            if (!isset($exportedvalues['pchkorg_module_use'])
+                || is_null($exportedvalues['pchkorg_module_use'])) {
                 $mform->setDefault('pchkorg_module_use', '1');
             }
         } else {
