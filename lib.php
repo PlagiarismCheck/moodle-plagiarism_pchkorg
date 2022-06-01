@@ -330,7 +330,8 @@ window.plagiarism_check_full_report = function (action, token) {
     
     form.submit();
 };
-window.onload = function () { 
+
+require([], function () { 
         var spans = window.document.getElementsByClassName('plagiarism-pchkorg-widget');
         for (var span of spans) {
             for (var classname of span.classList) {
@@ -370,8 +371,7 @@ window.onload = function () {
                 }
             }
         }
-}
-                "
+});"
                     );
                 }
 
