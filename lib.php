@@ -134,7 +134,6 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             $dissabledattribute
         );
         $mform->addHelpButton('pchkorg_min_percent', 'pchkorg_min_percent', 'plagiarism_pchkorg');
-        $mform->addRule('pchkorg_min_percent', null, 'text', null, 'client');
         $mform->addRule(
             'pchkorg_min_percent',
             get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'),
