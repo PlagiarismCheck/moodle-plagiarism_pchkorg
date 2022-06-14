@@ -330,47 +330,66 @@ window.plagiarism_check_full_report = function (action, token) {
     form.submit();
 };
 
-require([], function () { 
+require(['jquery'], function ($) { 
+    $(function () {
         var spans = window.document.getElementsByClassName('plagiarism-pchkorg-widget');
-        for (var span of spans) {
-            for (var classname of span.classList) {
-                if (classname.includes('plagiarism-pchkorg-widget-id-')) {
-                    var id = classname.replace('plagiarism-pchkorg-widget-id-', '');
-                    if (id) {
-                        for (var data of window.plagiarism_check_data) {
-                            if (data.id == id) {
-                                var a = document.createElement('a');
-                                a.setAttribute('href', '#');
-                                a.setAttribute('title', data.title);
-                                a.style.padding = '5px 3px';
-                                a.style.textDecoration = 'none';
-                                a.style.backgroundColor = data.color;
-                                a.style.color = 'black';
-                                a.style.cursor = 'pointer';
-                                a.style.borderRadius = '3px 3px 3px 3px';
-                                a.style.margin = '4px';
-                                a.style.display = 'inline-block';
-                                a.onclick = function() { 
-                                    window.plagiarism_check_full_report(data.action, data.token); 
-                                    return false;
-                                };
-                                var label = document.createTextNode(data.label);
-                                var img = document.createElement('img');
-                                img.setAttribute('alt', 'PlagiarismCheck.org');
-                                img.setAttribute('src', data.image);
-                                img.setAttribute('width', '20');
-                                a.appendChild(img);
-                                a.appendChild(label);
-                                span.appendChild(a);
-                                break;
+        for (var s in spans) {
+            var span = spans[s];
+            if (span) {
+                for (var c in span.classList) {
+                    var classname = span.classList[c];
+                    if (classname && classname.includes('plagiarism-pchkorg-widget-id-')) {
+                        var id = classname.replace('plagiarism-pchkorg-widget-id-', '');
+                        if (id) {
+                            for (var d in window.plagiarism_check_data) {
+                                var data = window.plagiarism_check_data[d];
+                                if (data && data.id == id) {
+                                    var a = document.createElement('a');
+                                    a.setAttribute('href', '#');
+                                    a.setAttribute('title', data.title);
+                                    a.setAttribute('data-id', data.id);
+                                    a.style.padding = '5px 3px';
+                                    a.style.textDecoration = 'none';
+                                    a.style.backgroundColor = data.color;
+                                    a.style.color = 'black';
+                                    a.style.cursor = 'pointer';
+                                    a.style.borderRadius = '3px 3px 3px 3px';
+                                    a.style.margin = '4px';
+                                    a.style.display = 'inline-block';
+                                    var label = document.createTextNode(data.label);
+                                    var img = document.createElement('img');
+                                    img.setAttribute('alt', 'PlagiarismCheck.org');
+                                    img.setAttribute('src', data.image);
+                                    img.setAttribute('width', '20');
+                                    a.appendChild(img);
+                                    a.appendChild(label);
+                                    span.appendChild(a);
+                                    break;
+                                }
                             }
                         }
+                        break;
                     }
-                    break;
                 }
             }
         }
-});"
+        
+        $(window.document.body).on('click', '.plagiarism-pchkorg-widget', function(e) {
+            var id = $(e.target).closest('a').attr('data-id')
+            if (id) {
+                for (var d in window.plagiarism_check_data) {
+                    var data = window.plagiarism_check_data[d];
+                    if (data && data.id == id) {
+                        window.plagiarism_check_full_report(data.action, data.token);
+                        break;
+                    }
+                }
+            }
+            return false;
+        })
+    });
+});
+"
                     );
                 }
 
