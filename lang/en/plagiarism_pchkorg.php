@@ -42,8 +42,19 @@ $string['pchkorg_min_percent_range'] = 'Must be between 0 and 99';
 $string['pchkorg_exclude_self_plagiarism'] = 'Exclude self-plagiarism';
 $string['pchkorg_include_referenced'] = 'Include References';
 $string['pchkorg_include_citation'] = 'Include Quotes';
+$string['pchkorg_enable_debug'] = 'Enable debug information';
+$string['pchkorg_enable_debug_help'] = 'This information can help you to understand why something not work';
 $string['pchkorg_enable_quiz'] = 'Enable PlagiarismCheck in Quizzes';
 $string['pchkorg_enable_forum'] = 'Enable PlagiarismCheck in Forum Activity';
+$string['pchkorg_debug_mime'] = 'Mime of file is not supported';
+$string['pchkorg_debug_disabled'] = 'Plugin is disabled';
+$string['pchkorg_debug_empty_context'] = 'Plugin is not supported in this place';
+$string['pchkorg_debug_user_has_no_permission'] = 'User has no moodle-permission to see this';
+$string['pchkorg_debug_disabled_acitivity'] = 'Plugin is disabled for this activity';
+$string['pchkorg_debug_not_member'] = 'User is not a member of plagiarismcheck group';
+$string['pchkorg_debug_user_has_no_capability'] = 'User does not have capability';
+$string['pchkorg_debug_no_check'] = 'There is no checks for this activity';
+$string['pchkorg_debug_status_error'] = 'Some error for this file';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>

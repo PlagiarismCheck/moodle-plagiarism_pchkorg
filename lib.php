@@ -187,6 +187,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
 
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
         $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+        $isdebugenabled = $pchkorgconfigmodel->get_system_config('pchkorg_enable_debug') === '1';
         $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
 
         $cmid = $linkarray['cmid'];
@@ -199,13 +200,22 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
 
         // We can do nothing with submissions which we can not handle.
         if (null !== $file && !$apiprovider->is_supported_mime($file->get_mimetype())) {
-            return '';
+            return $this->exit_message(
+                sprintf(
+                    '%s (%s)',
+                    get_string('pchkorg_debug_mime', 'plagiarism_pchkorg'),
+                    $file->get_mimetype()),
+                $isdebugenabled
+            );
         }
 
         // SQL will be called only once, result is static.
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' !== $config) {
-            return '';
+            return $this->exit_message(
+                get_string('pchkorg_debug_disabled', 'plagiarism_pchkorg'),
+                $isdebugenabled
+            );
         }
         $context = null;
         $component = !empty($linkarray['component']) ? $linkarray['component'] : '';
@@ -223,17 +233,26 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         }
 
         if (empty($context)) {
-            return '';
+            return $this->exit_message(
+                get_string('pchkorg_debug_empty_context', 'plagiarism_pchkorg'),
+                $isdebugenabled
+            );
         }
 
         $canview = has_capability(capability::VIEW_SIMILARITY, $context);
         if (!$canview) {
-            return '';
+            return $this->exit_message(
+                get_string('pchkorg_debug_user_has_no_permission', 'plagiarism_pchkorg'),
+                $isdebugenabled
+            );
         }
 
         // SQL will be called only once per page. There is static result inside.
         if (!$pchkorgconfigmodel->is_enabled_for_module($cmid)) {
-            return '';
+            return $this->exit_message(
+                get_string('pchkorg_debug_disabled_acitivity', 'plagiarism_pchkorg'),
+                $isdebugenabled
+            );
         }
 
         // Only for some type of account, method will call a remote HTTP API.
@@ -242,12 +261,24 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         // Even if service will be unavailable, method will try call API only once.
         // Also, we don't use raw user email.
         if (!$apiprovider->is_group_member($USER->email)) {
-            return '';
+            return $this->exit_message(
+                sprintf(
+                    '%s (%s)',
+                    get_string('pchkorg_debug_not_member', 'plagiarism_pchkorg'),
+                    $USER->email),
+                $isdebugenabled
+            );
         }
 
         $isgranted = !empty($context) && has_capability('mod/assign:view', $context, null);
         if (!$isgranted) {
-            return '';
+            return $this->exit_message(
+                sprintf(
+                    '%s (%s)',
+                    get_string('pchkorg_debug_user_has_no_capability', 'plagiarism_pchkorg'),
+                    'mod/assign:view'),
+                $isdebugenabled
+            );
         }
 
         $where = new \stdClass();
@@ -426,7 +457,36 @@ display: inline-block;"
                 <img src="' . $imgsrc . '" alt="logo" width="20" />
                 ' . $label . '
             </span>';
+            } else {
+                return $this->exit_message(
+                    sprintf(
+                        '%s (%s)',
+                        get_string('pchkorg_debug_status_error', 'plagiarism_pchkorg'),
+                        $filerecord->state),
+                    $isdebugenabled
+                );
             }
+        }
+
+        return $this->exit_message(
+            sprintf(
+                '%s (%s)',
+                get_string('pchkorg_debug_no_check', 'plagiarism_pchkorg'),
+                $cmid),
+            $isdebugenabled
+        );
+    }
+
+    /**
+     * Render message with reason why do we stop plugin.
+     *
+     * @param string $message - exit message
+     * @param bool $debug - is debug enabled.
+     * @return string
+     */
+    private function exit_message($message, $debug) {
+        if ($debug) {
+            return $message;
         }
 
         return '';

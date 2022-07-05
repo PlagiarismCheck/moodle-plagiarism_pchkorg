@@ -55,6 +55,14 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->addRule('pchkorg_token', null, 'required', null, 'client');
         $mform->setType('pchkorg_token', PARAM_TEXT);
 
+        $mform->addElement(
+            'select',
+            'pchkorg_enable_debug',
+            get_string('pchkorg_enable_debug', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+        $mform->addHelpButton('pchkorg_enable_debug', 'pchkorg_enable_debug', 'plagiarism_pchkorg');
+
         $mform->registerRule('check_pchkorg_min_percent', 'callback', 'pchkorg_check_pchkorg_min_percent');
 
         $label = get_string('pchkorg_min_percent', 'plagiarism_pchkorg');
