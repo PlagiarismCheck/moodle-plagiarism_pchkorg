@@ -66,6 +66,78 @@ class plagiarism_pchkorg_config_model {
 
     /**
      *
+     * Check if plugin show widget to student.
+     * Result is static.
+     *
+     * @param $module
+     * @return bool
+     */
+    public function show_widget_for_student($module) {
+        global $DB;
+
+        static $resultmap = array();
+        // This will be called only once per module.
+        if (!array_key_exists($module, $resultmap)) {
+            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+                'cm' => $module,
+                'name' => 'pchkorg_student_can_see_widget'
+            ));
+
+            $enabled = null;
+            foreach ($configs as $record) {
+                switch ($record->name) {
+                    case 'pchkorg_student_can_see_widget':
+                        $enabled = '1' == $record->value;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            $resultmap[$module] = $enabled;
+        }
+
+        return $resultmap[$module];
+    }
+
+    /**
+     *
+     * Check if plugin show report to student.
+     * Result is static.
+     *
+     * @param $module
+     * @return bool
+     */
+    public function show_report_for_student($module) {
+        global $DB;
+
+        static $resultmap = array();
+        // This will be called only once per module.
+        if (!array_key_exists($module, $resultmap)) {
+            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+                'cm' => $module,
+                'name' => 'pchkorg_student_can_see_report'
+            ));
+
+            $enabled = null;
+            foreach ($configs as $record) {
+                switch ($record->name) {
+                    case 'pchkorg_student_can_see_report':
+                        $enabled = '1' == $record->value;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            $resultmap[$module] = $enabled;
+        }
+
+        return $resultmap[$module];
+    }
+
+    /**
+     *
      * Get value for search setting
      *
      * @param $module

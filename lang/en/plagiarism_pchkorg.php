@@ -55,6 +55,9 @@ $string['pchkorg_debug_not_member'] = 'User is not a member of plagiarismcheck g
 $string['pchkorg_debug_user_has_no_capability'] = 'User does not have capability';
 $string['pchkorg_debug_no_check'] = 'There is no checks for this activity';
 $string['pchkorg_debug_status_error'] = 'Some error for this file';
+$string['pchkorg_debug_student_not_allowed_see_widget'] = 'Students can not see a similarity score';
+$string['pchkorg_student_can_see_widget'] = 'Students can see a similarity score';
+$string['pchkorg_student_can_see_report'] = 'Students can access a similarity report';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>

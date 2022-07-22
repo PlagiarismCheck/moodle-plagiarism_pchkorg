@@ -46,10 +46,6 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         );
         $mform->addHelpButton('pchkorg_use', 'pchkorg_use', 'plagiarism_pchkorg');
 
-        if (!isset($mform->exportValues()['pchkorg_use']) || is_null($mform->exportValues()['pchkorg_use'])) {
-            $mform->setDefault('pchkorg_use', false);
-        }
-
         $mform->addElement('password', 'pchkorg_token', get_string('pchkorg_token', 'plagiarism_pchkorg'));
         $mform->addHelpButton('pchkorg_token', 'pchkorg_token', 'plagiarism_pchkorg');
         $mform->addRule('pchkorg_token', null, 'required', null, 'client');

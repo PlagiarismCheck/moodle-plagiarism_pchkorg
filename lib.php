@@ -83,6 +83,17 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             $mform->setDefault('pchkorg_include_citation', 0);
         }
 
+        if (!isset($exportedvalues['pchkorg_student_can_see_report']) || is_null(
+                $exportedvalues['pchkorg_student_can_see_report']
+            )) {
+            $mform->setDefault('pchkorg_student_can_see_report', 1);
+        }
+        if (!isset($exportedvalues['pchkorg_student_can_see_widget']) || is_null(
+                $exportedvalues['pchkorg_student_can_see_widget']
+            )) {
+            $mform->setDefault('pchkorg_student_can_see_widget', 1);
+        }
+
         if (null === $cm) {
             if (!isset($exportedvalues['pchkorg_module_use'])
                 || is_null($exportedvalues['pchkorg_module_use'])) {
@@ -161,6 +172,21 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             get_string('pchkorg_include_citation', 'plagiarism_pchkorg'),
             array(get_string('no'), get_string('yes'))
         );
+
+
+        $mform->addElement(
+            'select',
+            'pchkorg_student_can_see_widget',
+            get_string('pchkorg_student_can_see_widget', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+
+        $mform->addElement(
+            'select',
+            'pchkorg_student_can_see_report',
+            get_string('pchkorg_student_can_see_report', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
     }
 }
 
@@ -221,7 +247,6 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         $component = !empty($linkarray['component']) ? $linkarray['component'] : '';
         if ($cmid === null && $component == 'qtype_essay' && !empty($linkarray['area'])) {
             $questions = question_engine::load_questions_usage_by_activity($linkarray['area']);
-
             $context = $questions->get_owning_context();
             if ($cmid === null && $context->contextlevel == CONTEXT_MODULE) {
                 $cmid = $context->instanceid;
@@ -238,8 +263,21 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 $isdebugenabled
             );
         }
+        $roleDatas = get_user_roles($context, $USER->id, true);
+        $roles = [];
+        foreach ($roleDatas as $rolesData) {
+            $roles[] = strtolower($rolesData->shortname);
+        }
+        // Moodle has multiple roles in courses.
+        $isstudent = in_array('student', $roles)
+            && !in_array('teacher', $roles)
+            && !in_array('editingteacher', $roles)
+            && !in_array('managerteacher', $roles);
 
         $canview = has_capability(capability::VIEW_SIMILARITY, $context);
+
+        $pchkorgconfigmodel->show_widget_for_student($cmid);
+
         if (!$canview) {
             return $this->exit_message(
                 get_string('pchkorg_debug_user_has_no_permission', 'plagiarism_pchkorg'),
@@ -254,6 +292,16 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 $isdebugenabled
             );
         }
+
+        // Widget for student is disabled.
+        if ($isstudent && $pchkorgconfigmodel->show_widget_for_student($cmid) === false) {
+            return $this->exit_message(
+                get_string('pchkorg_debug_student_not_allowed_see_widget', 'plagiarism_pchkorg'),
+                $isdebugenabled
+            );
+        }
+
+        $isreportallowed = !$isstudent || $pchkorgconfigmodel->show_report_for_student($cmid) === true;
 
         // Only for some type of account, method will call a remote HTTP API.
         // The API will be called only once, because result is static.
@@ -329,7 +377,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                     'token' => $reporttoken,
                     'image' => $imgsrc,
                     'label' => $label,
-                    'color' => $color
+                    'color' => $color,
+                    'isreportallowed' => $isreportallowed,
                 );
                 static $isjsfuncinjected = false;
                 if (!$isjsfuncinjected) {
@@ -410,7 +459,7 @@ require(['jquery'], function ($) {
             if (id) {
                 for (var d in window.plagiarism_check_data) {
                     var data = window.plagiarism_check_data[d];
-                    if (data && data.id == id) {
+                    if (data && data.id == id && data.isreportallowed) {
                         window.plagiarism_check_full_report(data.action, data.token);
                         break;
                     }
@@ -513,7 +562,9 @@ display: inline-block;"
             'pchkorg_min_percent',
             'pchkorg_include_citation',
             'pchkorg_include_referenced',
-            'pchkorg_exclude_self_plagiarism'
+            'pchkorg_exclude_self_plagiarism',
+            'pchkorg_student_can_see_widget',
+            'pchkorg_student_can_see_report'
         );
 
         $records = $DB->get_records('plagiarism_pchkorg_config', array(
