@@ -190,11 +190,6 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
     }
 }
 
-function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
-{
-
-}
-
 /**
  * Class plagiarism_plugin_pchkorg
  */
