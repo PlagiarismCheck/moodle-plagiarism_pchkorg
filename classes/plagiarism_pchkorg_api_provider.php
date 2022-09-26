@@ -603,13 +603,13 @@ class plagiarism_pchkorg_api_provider {
      */
     public function is_supported_mime($mime) {
         return in_array($mime, array(
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'application/rtf',
-                'application/vnd.oasis.opendocument.text',
-                'text/plain',
-                'plain/text',
-                'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/rtf',
+            'application/vnd.oasis.opendocument.text',
+            'text/plain',
+            'application/pdf'
         ), true);
     }
 
