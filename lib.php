@@ -192,7 +192,67 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
 
 function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
 {
+    global $DB;
 
+    $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
+
+    $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
+    if ('1' != $config) {
+        return;
+    }
+
+    $fields = array(
+        'pchkorg_module_use',
+        'pchkorg_min_percent',
+        'pchkorg_include_citation',
+        'pchkorg_include_referenced',
+        'pchkorg_exclude_self_plagiarism',
+        'pchkorg_student_can_see_widget',
+        'pchkorg_student_can_see_report'
+    );
+
+    $records = $DB->get_records('plagiarism_pchkorg_config', array(
+        'cm' => $data->coursemodule
+    ));
+
+    $context = context_module::instance($data->coursemodule);
+    $canchangeminpercent = has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context);
+
+    foreach ($fields as $field) {
+        $isfounded = false;
+        foreach ($records as $record) {
+            if ($record->name === $field) {
+                $isfounded = true;
+                if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
+                    $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
+                    break;
+                }
+                if ($field === 'pchkorg_min_percent' && 0 == $data->{$record->name}) {
+                    $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
+                    break;
+                }
+                $record->value = $data->{$record->name};
+                $DB->update_record('plagiarism_pchkorg_config', $record);
+                break;
+            }
+        }
+        if (!$isfounded && isset($data->{$field})) {
+            if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
+                continue;
+            }
+            if ($field === 'pchkorg_min_percent' && 0 == $data->{$field}) {
+                continue;
+            }
+            $insert = new \stdClass();
+            $insert->cm = $data->coursemodule;
+            $insert->name = $field;
+            $insert->value = $data->{$field};
+
+            $DB->insert_record('plagiarism_pchkorg_config', $insert);
+        }
+    }
+
+    return $data;
 }
 
 /**
@@ -390,27 +450,27 @@ window.plagiarism_check_full_report = function (action, token) {
     const form = document.createElement('form');
     const element1 = document.createElement('input');
     const element2 = document.createElement('input');
-    
+
     form.method = 'POST';
     form.target = '_blank';
     form.action = action;
-    
+
     element1.value = 'moodle';
     element1.name = 'lms-type';
     element1.type = 'hidden';
     form.appendChild(element1);
-    
+
     element2.value = token;
     element2.name = 'token';
     element2.type = 'hidden';
     form.appendChild(element2);
-    
+
     document.body.appendChild(form);
-    
+
     form.submit();
 };
 
-require(['jquery'], function ($) { 
+require(['jquery'], function ($) {
     $(function () {
         var spans = window.document.getElementsByClassName('plagiarism-pchkorg-widget');
         for (var s in spans) {
@@ -453,7 +513,7 @@ require(['jquery'], function ($) {
                 }
             }
         }
-        
+
         $(window.document.body).on('click', '.plagiarism-pchkorg-widget', function(e) {
             var id = $(e.target).closest('a').attr('data-id')
             if (id) {
@@ -548,65 +608,7 @@ display: inline-block;"
      * @throws dml_exception
      */
     public function save_form_elements($data) {
-        global $DB;
-
-        $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
-
-        $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
-        if ('1' != $config) {
-            return;
-        }
-
-        $fields = array(
-            'pchkorg_module_use',
-            'pchkorg_min_percent',
-            'pchkorg_include_citation',
-            'pchkorg_include_referenced',
-            'pchkorg_exclude_self_plagiarism',
-            'pchkorg_student_can_see_widget',
-            'pchkorg_student_can_see_report'
-        );
-
-        $records = $DB->get_records('plagiarism_pchkorg_config', array(
-            'cm' => $data->coursemodule
-        ));
-
-        $context = context_module::instance($data->coursemodule);
-        $canchangeminpercent = has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context);
-
-        foreach ($fields as $field) {
-            $isfounded = false;
-            foreach ($records as $record) {
-                if ($record->name === $field) {
-                    $isfounded = true;
-                    if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
-                        $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
-                        break;
-                    }
-                    if ($field === 'pchkorg_min_percent' && 0 == $data->{$record->name}) {
-                        $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
-                        break;
-                    }
-                    $record->value = $data->{$record->name};
-                    $DB->update_record('plagiarism_pchkorg_config', $record);
-                    break;
-                }
-            }
-            if (!$isfounded && isset($data->{$field})) {
-                if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
-                    continue;
-                }
-                if ($field === 'pchkorg_min_percent' && 0 == $data->{$field}) {
-                    continue;
-                }
-                $insert = new \stdClass();
-                $insert->cm = $data->coursemodule;
-                $insert->name = $field;
-                $insert->value = $data->{$field};
-
-                $DB->insert_record('plagiarism_pchkorg_config', $insert);
-            }
-        }
+        return plagiarism_pchkorg_coursemodule_edit_post_actions($data, null);
     }
 
     /**
