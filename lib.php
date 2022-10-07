@@ -198,7 +198,7 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
 
     $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
     if ('1' != $config) {
-        return;
+        return $data;
     }
 
     $fields = array(
