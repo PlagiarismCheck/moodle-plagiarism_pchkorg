@@ -493,7 +493,7 @@ class plagiarism_pchkorg_api_provider {
                     'CURLOPT_SSL_VERIFYHOST' => false,
                     'CURLOPT_SSL_VERIFYPEER' => false,
                 // The maximum number of seconds to allow cURL functions to execute.
-                    'CURLOPT_TIMEOUT' => 2
+                    'CURLOPT_TIMEOUT' => 8
             ));
 
             if ($json = json_decode($response)) {
