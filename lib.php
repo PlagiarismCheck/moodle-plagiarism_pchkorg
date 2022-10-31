@@ -361,7 +361,9 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             );
         }
 
-        $isreportallowed = !$isstudent || $pchkorgconfigmodel->show_report_for_student($cmid) === true;
+        $isreportallowed = !$isstudent
+            || $pchkorgconfigmodel->show_report_for_student($cmid) === true
+            || $pchkorgconfigmodel->show_report_for_student($cmid) === null;
 
         // Only for some type of account, method will call a remote HTTP API.
         // The API will be called only once, because result is static.
