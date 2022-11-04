@@ -507,6 +507,88 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * Check that user belongs to group when it is group account.
+     * And Receive auto_registration_option.
+     *
+     * @param string $email
+     * @return object
+     */
+    public function get_group_member_response($email = '') {
+        if (!$this->is_group_token()) {
+            $result = new \stdClass;
+            $result->is_member = true;
+            $result->is_auto_registration_enabled = false;
+
+            return $result;
+        }
+
+        static $resultmap = array();
+
+        if (!array_key_exists($email, $resultmap)) {
+            //default result. For case when we can not receive response.
+            $result = new \stdClass;
+            $result->is_member = false;
+            $result->is_auto_registration_enabled = false;
+            $resultmap[$email] = $result;
+
+            $curl = new curl();
+            $response = $curl->post($this->endpoint . '/lms/moodle/is-group-member/', array(
+                    'token' => $this->token,
+                    'hash' => $this->user_email_to_hash($email)
+            ), array(
+                    'CURLOPT_RETURNTRANSFER' => true,
+                    'CURLOPT_FOLLOWLOCATION' => true,
+                    'CURLOPT_SSL_VERIFYHOST' => false,
+                    'CURLOPT_SSL_VERIFYPEER' => false,
+                // The maximum number of seconds to allow cURL functions to execute.
+                    'CURLOPT_TIMEOUT' => 8
+            ));
+
+            if ($json = json_decode($response)) {
+                $result->is_member = $json->is_member;
+                $result->is_auto_registration_enabled = $json->is_auto_registration_enabled;
+                $resultmap[$email] = $result;
+            }
+        }
+
+        return $resultmap[$email];
+    }
+
+   /**
+     * Auto registration is enabled for this university,
+     *  so we registrate a user and user can check submissions.
+     *
+     * @param $name
+     * @param $email
+     * @param $role
+     *
+     * @return bool
+     */
+    public function auto_registrate_member($name, $email, $role) {
+        $curl = new curl();
+        $response = $curl->post($this->endpoint . '/lms/moodle/auto-registration/', array(
+                'token' => $this->token,
+                'name' => $name,
+                'email' => $email,
+                'role' => $role,
+        ), array(
+                'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_FOLLOWLOCATION' => true,
+                'CURLOPT_SSL_VERIFYHOST' => false,
+                'CURLOPT_SSL_VERIFYPEER' => false,
+            // The maximum number of seconds to allow cURL functions to execute.
+                'CURLOPT_TIMEOUT' => 8
+        ));
+
+
+        if ($json = json_decode($response)) {
+            return $json->success;
+        }
+
+        return false;
+    }
+
+    /**
      * Check status of document.
      * If document has been checked, state is 5.
      *

@@ -367,7 +367,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
 
         // Only for some type of account, method will call a remote HTTP API.
         // The API will be called only once, because result is static.
-        // Also, there is timeout 2 seconds for response.
+        // Also, there is timeout 8 seconds for response.
         // Even if service will be unavailable, method will try call API only once.
         // Also, we don't use raw user email.
         if (!$apiprovider->is_group_member($USER->email)) {
@@ -680,6 +680,17 @@ display: inline-block;"
     public function event_handler($eventdata) {
         global $USER, $DB;
 
+        // Whitelist of supported events, ignore other.
+        $issupportedevent = in_array($eventdata['eventtype'], array(
+            "forum_attachment",
+            "quiz_submitted",
+            "assessable_submitted",
+            "content_uploaded"
+        ));
+        if (!$issupportedevent) {
+            return true;
+        }
+
         $modulename = $eventdata['other']['modulename'];
         $allowedmodules = array('assign', 'mod_assign');
         // We support only assign module so just ignore all other.
@@ -706,7 +717,7 @@ display: inline-block;"
         $cmid = $eventdata['contextinstanceid'];
         // Remove the event if the course module no longer exists.
         $cm = get_coursemodule_from_id($eventdata['other']['modulename'], $cmid);
-
+        $context = context_module::instance($cm->id);
         if (!$cm) {
             return true;
         }
@@ -719,11 +730,30 @@ display: inline-block;"
 
         // Only for some type of account, method will call a remote HTTP API.
         // The API will be called only once, because result is static.
-        // Also, there is timeout 2 seconds for response.
+        // Also, there is timeout 8 seconds for response.
         // Even if service is unavailable, method will try call only once.
         // Also, we don't use raw users email.
-        if (!$apiprovider->is_group_member($USER->email)) {
-            return true;
+        $ismemberresponse = $apiprovider->get_group_member_response($USER->email);
+        if (!$ismemberresponse->is_member) {
+            if ($ismemberresponse->is_auto_registration_enabled) {
+                $name = $USER->firstname . ' ' . $USER->lastname;
+                $roleDatas = get_user_roles($context, $USER->id, true);
+                $roles = [];
+                foreach ($roleDatas as $rolesData) {
+                    $roles[] = strtolower($rolesData->shortname);
+                }
+                // Moodle has multiple roles in courses.
+                $isstudent = in_array('student', $roles)
+                    && !in_array('teacher', $roles)
+                    && !in_array('editingteacher', $roles)
+                    && !in_array('managerteacher', $roles);
+                $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
+                if (!$isregistered) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
         }
 
         // Set the author and submitter.
@@ -733,7 +763,7 @@ display: inline-block;"
         // Related user ID will be NULL if an instructor submits on behalf of a student who is in a group.
         // To get around this, we get the group ID, get the group members and set the author as the first student in the group.
         if ((empty($eventdata['relateduserid'])) && ($eventdata['other']['modulename'] == 'assign')
-            && has_capability('mod/assign:editothersubmission', context_module::instance($cm->id), $submitter)) {
+            && has_capability('mod/assign:editothersubmission', $context, $submitter)) {
             $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id, groupid');
             if (!empty($moodlesubmission->groupid)) {
                 $author = $this->get_first_group_author($cm->course, $moodlesubmission->groupid);
