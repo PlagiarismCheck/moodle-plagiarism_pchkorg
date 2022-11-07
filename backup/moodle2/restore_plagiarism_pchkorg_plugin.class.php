@@ -19,7 +19,7 @@ defined('MOODLE_INTERNAL') || die();
 
 class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
 
-    public function process_pchkorgconfig($data) {
+    public function process_pchkorg_config($data) {
         $data = (object) $data;
 
         set_config($this->task->get_courseid(), $data->value, $data->plugin);
@@ -49,9 +49,9 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
     protected function define_course_plugin_structure() {
         $paths = [];
 
-        // Add own format stuff.
         $elename = 'pchkorg_config';
-        $elepath = $this->get_pathfor('pchkorg_configs/pchkorg_config'); // We used get_recommended_name() so this works.
+        $elepath = $this->get_pathfor('/pchkorg_configs/pchkorg_config'); 
+
         $paths[] = new restore_path_element($elename, $elepath);
 
         return $paths; // And we return the interesting paths.
@@ -62,7 +62,7 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
         $paths = [];
 
         $elename = 'pchkorgconfigmod';
-        $elepath = $this->get_pathfor('pchkorg_configs/pchkorg_config');
+        $elepath = $this->get_pathfor('/pchkorg_activities_configs/pchkorg_activities_config');
         $paths[] = new restore_path_element($elename, $elepath);
 
         $elename = 'pchkorgfiles';
