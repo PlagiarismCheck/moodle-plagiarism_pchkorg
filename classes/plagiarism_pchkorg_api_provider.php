@@ -177,7 +177,7 @@ class plagiarism_pchkorg_api_provider {
                         $content,
                         $mime,
                         $filename,
-                        $filters,
+                        $filters
                 ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
@@ -299,7 +299,7 @@ class plagiarism_pchkorg_api_provider {
                     $content,
                     $mime,
                     $filename,
-                    $filters,
+                    $filters
                 ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,

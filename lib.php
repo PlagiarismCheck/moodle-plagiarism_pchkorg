@@ -66,7 +66,7 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
         $defaultcmid = null;
         $cm = optional_param('update', $defaultcmid, PARAM_INT);
         $minpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
-        $exportedvalues = $mform->exportValues([]);
+        $exportedvalues = $mform->exportValues(array());
         if (!is_array($exportedvalues)) {
             $exportedvalues = array();
         }
@@ -324,7 +324,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             );
         }
         $roleDatas = get_user_roles($context, $USER->id, true);
-        $roles = [];
+        $roles = array();
         foreach ($roleDatas as $rolesData) {
             $roles[] = strtolower($rolesData->shortname);
         }
@@ -738,7 +738,7 @@ display: inline-block;"
             if ($ismemberresponse->is_auto_registration_enabled) {
                 $name = $USER->firstname . ' ' . $USER->lastname;
                 $roleDatas = get_user_roles($context, $USER->id, true);
-                $roles = [];
+                $roles = array();
                 foreach ($roleDatas as $rolesData) {
                     $roles[] = strtolower($rolesData->shortname);
                 }
@@ -1099,7 +1099,7 @@ display: inline-block;"
                 } else {
                     $minpercent = $systemminpercent;
                 }
-                $filters = [
+                $filters = array(
                     'include_references' => $pchkorgconfigmodel->get_filter_for_module(
                         $cm->id,
                         'pchkorg_include_referenced'
@@ -1112,7 +1112,7 @@ display: inline-block;"
                         $cm->id,
                         'pchkorg_exclude_self_plagiarism'
                     ),
-                ];
+                );
                 if ($minpercent) {
                     $filters['source_min_percent'] = $minpercent;
                 }
@@ -1153,7 +1153,7 @@ display: inline-block;"
                                     html_to_text($content, 75, false),
                                     'plain/text',
                                     sprintf('%s-quiz.txt', $filedb->itemid),
-                                    $filters,
+                                    $filters
                                 );
                                 break;
                             }
@@ -1222,7 +1222,7 @@ display: inline-block;"
                                     html_to_text($content, 75, false),
                                     'plain/text',
                                     sprintf('%s-quiz.txt', $filedb->itemid),
-                                    $filters,
+                                    $filters
                                 );
                             }
                         }
@@ -1280,7 +1280,7 @@ display: inline-block;"
                                 html_to_text($content, 75, false),
                                 'plain/text',
                                 sprintf('%s-submussion.txt', $moodletextsubmission->id),
-                                $filters,
+                                $filters
                             );
                         }
                     } else {

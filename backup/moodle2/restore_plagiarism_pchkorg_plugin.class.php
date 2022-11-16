@@ -47,7 +47,7 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
 
 
     protected function define_course_plugin_structure() {
-        $paths = [];
+        $paths = array();
 
         $elename = 'pchkorg_config';
         $elepath = $this->get_pathfor('/pchkorg_configs/pchkorg_config'); 
@@ -59,7 +59,7 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
 
 
     protected function define_module_plugin_structure() {
-        $paths = [];
+        $paths = array();
 
         $elename = 'pchkorgconfigmod';
         $elepath = $this->get_pathfor('/pchkorg_activities_configs/pchkorg_activities_config');
