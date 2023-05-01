@@ -329,8 +329,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             $roles[] = strtolower($rolesData->shortname);
         }
         // Moodle has multiple roles in courses.
-        $isstudent = in_array('student', $roles)
-            && !in_array('teacher', $roles)
+        $isstudent = !in_array('teacher', $roles)
             && !in_array('editingteacher', $roles)
             && !in_array('managerteacher', $roles);
 
