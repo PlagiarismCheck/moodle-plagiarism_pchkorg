@@ -329,7 +329,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             $roles[] = strtolower($rolesData->shortname);
         }
         // Moodle has multiple roles in courses.
-        $isstudent = !in_array('teacher', $roles)
+        $isstudent = in_array('student', $roles)
+            && !in_array('teacher', $roles)
             && !in_array('editingteacher', $roles)
             && !in_array('managerteacher', $roles);
 
@@ -742,10 +743,9 @@ display: inline-block;"
                     $roles[] = strtolower($rolesData->shortname);
                 }
                 // Moodle has multiple roles in courses.
-                $isstudent = in_array('student', $roles)
-                    && !in_array('teacher', $roles)
-                    && !in_array('editingteacher', $roles)
-                    && !in_array('managerteacher', $roles);
+                $isstudent = !in_array('teacher', $roles)
+					&& !in_array('editingteacher', $roles)
+					&& !in_array('managerteacher', $roles);
                 $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
                 if (!$isregistered) {
                     return true;
