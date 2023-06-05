@@ -744,8 +744,8 @@ display: inline-block;"
                 }
                 // Moodle has multiple roles in courses.
                 $isstudent = !in_array('teacher', $roles)
-					&& !in_array('editingteacher', $roles)
-					&& !in_array('managerteacher', $roles);
+                    && !in_array('editingteacher', $roles)
+                    && !in_array('managerteacher', $roles);
                 $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
                 if (!$isregistered) {
                     return true;
