@@ -26,9 +26,9 @@ defined('MOODLE_INTERNAL') || die();
 if (!isset($plugin)) {
     $plugin = new stdClass();
 }
-$plugin->version = 2023050117;
+$plugin->version = 2023060611;
 $plugin->requires = 2020061501; // Requires Moodle 3.9 .
-$plugin->release = 'v3.13.4';
+$plugin->release = 'v3.13.5';
 $plugin->component = 'plagiarism_pchkorg';
 $plugin->maturity = MATURITY_STABLE;
 $plugin->dependencies = array(
