@@ -57,5 +57,16 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2021072801, 'plagiarism', 'pchkorg');
     }
 
+    if ($oldversion < 2023060713) {
+        $table = new xmldb_table('plagiarism_pchkorg_files');
+
+        $field1 = new xmldb_field('scoreai', XMLDB_TYPE_NUMBER, '4,2', XMLDB_UNSIGNED, null, null, null, null);
+        $field1->setComment('AI score');
+
+        if (!$dbman->field_exists($table, $field1)) {
+            $dbman->add_field($table, $field1);
+        }
+    }
+
     return true;
 }

@@ -420,24 +420,44 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 $action = $apiprovider->get_report_action($filerecord->textid);
                 $reporttoken = $apiprovider->generate_api_token();
                 $score = $filerecord->score;
-                $title = sprintf(get_string('pchkorg_label_title', 'plagiarism_pchkorg'),
-                    $filerecord->textid,
-                    $score);
-                $label = sprintf(get_string('pchkorg_label_result', 'plagiarism_pchkorg'), $filerecord->textid, $score);
+                if (isset($filerecord->scoreai)) {
+                    $title = sprintf(
+                        get_string('pchkorg_label_title_ai', 'plagiarism_pchkorg'),
+                        $filerecord->textid,
+                        $score,
+                        $filerecord->scoreai
+                    );
+                    $label = sprintf(
+                        get_string('pchkorg_label_result_ai', 'plagiarism_pchkorg'), 
+                        $filerecord->textid, 
+                        $score,
+                        $filerecord->scoreai
+                    );
+                } else {
+                    $title = sprintf(
+                        get_string('pchkorg_label_title', 'plagiarism_pchkorg'),
+                        $filerecord->textid,
+                        $score
+                    );
+                    $label = sprintf(
+                        get_string('pchkorg_label_result', 'plagiarism_pchkorg'), 
+                        $filerecord->textid, 
+                        $score
+                    );
+                }
 
                 if ($score < 30) {
-                    $color = '#63ec80a1';
+                    $color = '#63EC80';
                 } else if (30 < $score && $score < 60) {
-                    $color = '#f7b011';
+                    $color = '#F7B011';
                 } else {
-                    $color = '#f04343';
+                    $color = '#F04343';
                 }
                 $jsdata = array(
                     'id' => $filerecord->id,
                     'title' => $title,
                     'action' => $action,
                     'token' => $reporttoken,
-                    'image' => $imgsrc,
                     'label' => $label,
                     'color' => $color,
                     'isreportallowed' => $isreportallowed,
@@ -490,20 +510,20 @@ require(['jquery'], function ($) {
                                     a.setAttribute('href', '#');
                                     a.setAttribute('title', data.title);
                                     a.setAttribute('data-id', data.id);
-                                    a.style.padding = '5px 3px';
+                                    a.style.fontFamily =  'Roboto';
+                                    a.style.fontStyle = 'normal';
+                                    a.style.fontWeight =  '400';
+                                    a.style.fontSize =  '16px';
+                                    a.style.textAlign =  'center';
+                                    a.style.padding = '4px 16px';
                                     a.style.textDecoration = 'none';
                                     a.style.backgroundColor = data.color;
                                     a.style.color = 'black';
                                     a.style.cursor = 'pointer';
-                                    a.style.borderRadius = '3px 3px 3px 3px';
+                                    a.style.borderRadius = '4px 4px 4px 4px';
                                     a.style.margin = '4px';
                                     a.style.display = 'inline-block';
                                     var label = document.createTextNode(data.label);
-                                    var img = document.createElement('img');
-                                    img.setAttribute('alt', 'PlagiarismCheck.org');
-                                    img.setAttribute('src', data.image);
-                                    img.setAttribute('width', '20');
-                                    a.appendChild(img);
                                     a.appendChild(label);
                                     span.appendChild(a);
                                     break;
@@ -1369,6 +1389,7 @@ display: inline-block;"
                 $filedbnew->state = 5;
                 $filedbnew->reportid = $report->id;
                 $filedbnew->score = $report->percent;
+                $filedbnew->scoreai = $report->percent_ai;
 
                 $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
             }

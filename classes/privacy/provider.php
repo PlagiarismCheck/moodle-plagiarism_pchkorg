@@ -59,6 +59,7 @@ class provider implements
                         'userid' => 'privacy:metadata:plagiarism_pchkorg_files:userid',
                         'state' => 'privacy:metadata:plagiarism_pchkorg_files:state',
                         'score' => 'privacy:metadata:plagiarism_pchkorg_files:score',
+                        'scoreai' => 'privacy:metadata:plagiarism_pchkorg_files:scoreai',
                         'created_at' => 'privacy:metadata:plagiarism_pchkorg_files:created_at',
                         'textid' => 'privacy:metadata:plagiarism_pchkorg_files:textid',
                         'reportid' => 'privacy:metadata:plagiarism_pchkorg_files:reportid',

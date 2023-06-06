@@ -181,9 +181,6 @@ class plagiarism_pchkorg_api_provider {
                 ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
-                        'CURLOPT_FOLLOWLOCATION' => true,
-                        'CURLOPT_SSL_VERIFYHOST' => false,
-                        'CURLOPT_SSL_VERIFYPEER' => false,
                         'CURLOPT_HTTPHEADER' => array(
                                 'X-API-TOKEN: ' . $this->generate_api_token(),
                                 'Content-Type: multipart/form-data; boundary=' . $boundary
@@ -303,9 +300,6 @@ class plagiarism_pchkorg_api_provider {
                 ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
-                        'CURLOPT_FOLLOWLOCATION' => true,
-                        'CURLOPT_SSL_VERIFYHOST' => false,
-                        'CURLOPT_SSL_VERIFYPEER' => false,
                         'CURLOPT_POST' => true,
                         'CURLOPT_HTTPHEADER' => array(
                                 'X-API-TOKEN: ' . $this->generate_api_token(),
@@ -347,9 +341,6 @@ class plagiarism_pchkorg_api_provider {
                 '',
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
-                        'CURLOPT_FOLLOWLOCATION' => true,
-                        'CURLOPT_SSL_VERIFYHOST' => false,
-                        'CURLOPT_SSL_VERIFYPEER' => false,
                         'CURLOPT_POST' => true,
                         'CURLOPT_HTTPHEADER' => array(
                                 'X-API-TOKEN: ' . $token,
@@ -489,9 +480,6 @@ class plagiarism_pchkorg_api_provider {
                     'hash' => $this->user_email_to_hash($email)
             ), array(
                     'CURLOPT_RETURNTRANSFER' => true,
-                    'CURLOPT_FOLLOWLOCATION' => true,
-                    'CURLOPT_SSL_VERIFYHOST' => false,
-                    'CURLOPT_SSL_VERIFYPEER' => false,
                 // The maximum number of seconds to allow cURL functions to execute.
                     'CURLOPT_TIMEOUT' => 8
             ));
@@ -537,9 +525,6 @@ class plagiarism_pchkorg_api_provider {
                     'hash' => $this->user_email_to_hash($email)
             ), array(
                     'CURLOPT_RETURNTRANSFER' => true,
-                    'CURLOPT_FOLLOWLOCATION' => true,
-                    'CURLOPT_SSL_VERIFYHOST' => false,
-                    'CURLOPT_SSL_VERIFYPEER' => false,
                 // The maximum number of seconds to allow cURL functions to execute.
                     'CURLOPT_TIMEOUT' => 8
             ));
@@ -573,9 +558,6 @@ class plagiarism_pchkorg_api_provider {
                 'role' => $role,
         ), array(
                 'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_FOLLOWLOCATION' => true,
-                'CURLOPT_SSL_VERIFYHOST' => false,
-                'CURLOPT_SSL_VERIFYPEER' => false,
             // The maximum number of seconds to allow cURL functions to execute.
                 'CURLOPT_TIMEOUT' => 8
         ));
@@ -601,12 +583,10 @@ class plagiarism_pchkorg_api_provider {
             // It uses different auth.
             return $this->group_check_text($textid);
         }
+
         $curl = new curl();
         $response = $curl->get($this->endpoint . '/api/v1/text/' . $textid, array(), array(
                 'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_FOLLOWLOCATION' => true,
-                'CURLOPT_SSL_VERIFYHOST' => false,
-                'CURLOPT_SSL_VERIFYPEER' => false,
                 'CURLOPT_POST' => false,
                 'CURLOPT_HTTPHEADER' => array(
                         'X-API-TOKEN: ' . $this->generate_api_token(),
@@ -615,7 +595,12 @@ class plagiarism_pchkorg_api_provider {
         ));
         if ($json = json_decode($response)) {
             if (isset($json->data) && 5 == $json->data->state) {
-                return $json->data->report;
+                $result = new stdClass;
+                $result->id = $json->data->report->id;
+                $result->percent = $json->data->report->percent;
+                $result->percent_ai = $json->data->ai_report->processed_percent;
+
+                return $result;
             }
         }
 
@@ -635,9 +620,6 @@ class plagiarism_pchkorg_api_provider {
                 'token' => $this->token
         ), array(
                 'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_FOLLOWLOCATION' => true,
-                'CURLOPT_SSL_VERIFYHOST' => false,
-                'CURLOPT_SSL_VERIFYPEER' => false,
                 'CURLOPT_POST' => false,
                 'CURLOPT_HTTPHEADER' => array(
                         'Content-Type: application/x-www-form-urlencoded'
@@ -645,7 +627,12 @@ class plagiarism_pchkorg_api_provider {
         ));
         if ($json = json_decode($response)) {
             if (isset($json->data) && 5 == $json->data->state) {
-                return $json->data->report;
+                $result = new stdClass;
+                $result->id = $json->data->report->id;
+                $result->percent = $json->data->report->percent;
+                $result->percent_ai = $json->data->ai_report->processed_percent;
+
+                return $result;
             }
         }
 
