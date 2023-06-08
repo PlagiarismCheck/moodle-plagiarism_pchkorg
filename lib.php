@@ -173,7 +173,6 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             array(get_string('no'), get_string('yes'))
         );
 
-
         $mform->addElement(
             'select',
             'pchkorg_student_can_see_widget',
@@ -187,6 +186,14 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             get_string('pchkorg_student_can_see_report', 'plagiarism_pchkorg'),
             array(get_string('no'), get_string('yes'))
         );
+
+        $mform->addElement(
+            'select',
+            'pchkorg_check_ai',
+            get_string('pchkorg_check_ai', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+        $mform->setDefault('pchkorg_check_ai', 1);
     }
 }
 
@@ -208,7 +215,8 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
         'pchkorg_include_referenced',
         'pchkorg_exclude_self_plagiarism',
         'pchkorg_student_can_see_widget',
-        'pchkorg_student_can_see_report'
+        'pchkorg_student_can_see_report',
+        'pchkorg_check_ai'
     );
 
     $records = $DB->get_records('plagiarism_pchkorg_config', array(
@@ -420,7 +428,9 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 $action = $apiprovider->get_report_action($filerecord->textid);
                 $reporttoken = $apiprovider->generate_api_token();
                 $score = $filerecord->score;
-                if (isset($filerecord->scoreai)) {
+                $isaienabled = '1' === $pchkorgconfigmodel->get_filter_for_module($cmid, 'pchkorg_check_ai');
+
+                if (isset($filerecord->scoreai) && $isaienabled) {
                     $title = sprintf(
                         get_string('pchkorg_label_title_ai', 'plagiarism_pchkorg'),
                         $filerecord->textid,
