@@ -658,7 +658,7 @@ class plagiarism_pchkorg_api_provider {
         global $USER;
 
         if ($this->is_group_token()) {
-            return $this->token . '::' . hash('sha256', $this->token . $USER->email);
+            return $this->token . '::' . hash('sha256', $this->token . strtolower($USER->email));
         }
 
         return $this->token;
