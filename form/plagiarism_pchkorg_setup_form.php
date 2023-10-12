@@ -86,6 +86,14 @@ class plagiarism_pchkorg_setup_form extends moodleform {
             array(get_string('no'), get_string('yes'))
         );
 
+        $mform->addElement(
+            'select',
+            'pchkorg_enabled_by_default',
+            get_string('pchkorg:enabledbydefault', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+        $mform->setDefault('pchkorg_enabled_by_default', '1');
+
         $this->add_action_buttons(true);
     }
 

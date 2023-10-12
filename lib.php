@@ -97,7 +97,13 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
         if (null === $cm) {
             if (!isset($exportedvalues['pchkorg_module_use'])
                 || is_null($exportedvalues['pchkorg_module_use'])) {
-                $mform->setDefault('pchkorg_module_use', '1');
+                $enabledbydefault = $pchkorgconfigmodel->get_system_config('pchkorg_enabled_by_default');
+                if ('1' === $enabledbydefault || null === $enabledbydefault) {
+                    $mform->setDefault('pchkorg_module_use', '1');
+                }
+                if ('0' === $enabledbydefault) {
+                    $mform->setDefault('pchkorg_module_use', '0');
+                }
             }
         } else {
             $records = $DB->get_records('plagiarism_pchkorg_config', array(
@@ -284,7 +290,11 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         $isdebugenabled = $pchkorgconfigmodel->get_system_config('pchkorg_enable_debug') === '1';
         $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
 
-        $cmid = $linkarray['cmid'];
+        $cmid = null;
+        if (array_key_exists('cmid', $linkarray)) {
+            $cmid = $linkarray['cmid'];
+        }
+
         if (array_key_exists('file', $linkarray)) {
             $file = $linkarray['file'];
         } else {
@@ -1159,11 +1169,13 @@ display: inline-block;"
 
                 if ($cm->modname === 'quiz') {
                     if ($filedb->fileid === null) {
+
                         $questionanswers = $DB->get_records_sql(
                             "SELECT {question_attempts}.responsesummary "
                             ." FROM {question_attempts} "
-                            ." INNER JOIN {question} on {question}.id = {question_attempts}.questionid "
-                            ." WHERE {question_attempts}.questionusageid = ? AND {question}.qtype = 'essay' ", array(
+                            ." INNER JOIN  {question} on  {question}.id =  {question_attempts}.questionid "
+                            ." INNER JOIN {quiz_attempts} on {quiz_attempts}.uniqueid = {question_attempts}.questionusageid "
+                            ." WHERE   {quiz_attempts}.id= ? AND  {question}.qtype = 'essay' ", array(
                                 $filedb->itemid
                             )
                         );

@@ -97,3 +97,4 @@ $string['pchkorg_label_queued'] = 'In queue';
 $string['pchkorg:enable'] = 'Allow to enable/disable PlagiarismCheck.org inside an activity';
 $string['pchkorg:viewsimilarity'] = 'Allow to view similarity value from PlagiarismCheck.org';
 $string['pchkorg:changeminpercentfilter'] = 'Allow changing "Exclude sources below X% similarity"';
+$string['pchkorg:enabledbydefault'] = 'Enable PlagiarismCheck in Activities by default';
