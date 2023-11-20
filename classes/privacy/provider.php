@@ -26,6 +26,16 @@ namespace plagiarism_pchkorg\privacy;
 defined('MOODLE_INTERNAL') || die();
 
 use core_privacy\local\metadata\collection;
+use core_privacy\local\request\contextlist;
+use core_privacy\local\request\approved_contextlist;
+use core_privacy\local\request\userlist;
+use core_privacy\local\request\approved_userlist;
+
+if (interface_exists('\core_privacy\local\request\userlist')) {
+    interface my_userlist extends \core_privacy\local\request\userlist{}
+} else {
+    interface my_userlist {};
+}
 
 /**
  * Class provider
@@ -33,8 +43,10 @@ use core_privacy\local\metadata\collection;
  * @package plagiarism_pchkorg\privacy
  */
 class provider implements
+        my_userlist,
         \core_privacy\local\metadata\provider,
-        \core_privacy\local\request\plugin\provider {
+        \core_privacy\local\request\plugin\provider,
+        \core_privacy\local\request\core_userlist_provider {
 
     // This trait must be included.
     use \core_privacy\local\legacy_polyfill;
@@ -91,5 +103,81 @@ class provider implements
         );
 
         return $collection;
+    }
+
+    /**
+     * Get the list of contexts that contain user information for the specified user.
+     *
+     * @param   int         $userid     The user to search.
+     * @return  contextlist   $contextlist  The contextlist containing the list of contexts used in this plugin.
+     */
+    public static function _get_contexts_for_userid(int $userid) : contextlist {
+        $contextlist = new contextlist();
+        $sql = "SELECT DISTINCT cm FROM {plagiarism_pchkorg_files} WHERE userid = :userid";
+        $params = [
+            'userid' => $userid
+        ];
+        $contextlist->add_from_sql($sql, $params);
+
+        return $contextlist;
+    }
+
+    /**
+     * Get the list of users who have data within a context.
+     *
+     * @param   userlist    $userlist   The userlist containing the list of users who have data in this context/plugin combination.
+     */
+    public static function get_users_in_context(userlist $userlist) {
+        $context = $userlist->get_context();
+        if (!$context instanceof \context_module) {
+            return;
+        }
+        $params = [
+            'cm'    => $context->instanceid,
+        ];
+        $sql = "SELECT DISTINCT userid FROM {plagiarism_pchkorg_files} WHERE cm = :cm";
+        $userlist->add_from_sql('userid', $sql, $params);
+    }
+
+    /**
+     * Export all user data for the specified user, in the specified contexts.
+     *
+     * @param   approved_contextlist    $contextlist    The approved contexts to export information for.
+     */
+    public static function _export_user_data(approved_contextlist $contextlist) {
+    }
+
+    /**
+     * Delete multiple users within a single context.
+     *
+     * @param   approved_userlist       $userlist The approved context and user information to delete information for.
+     */
+    public static function delete_data_for_users(approved_userlist $userlist) {
+    }
+
+
+    /**
+     * Export all user preferences for the plugin.
+     *
+     * @param   int         $userid The userid of the user whose data is to be exported.
+     */
+    public static function _export_user_preferences(int $userid) {
+    }
+
+
+    /**
+     * Delete all data for all users in the specified context.
+     *
+     * @param   context         $context   The specific context to delete data for.
+     */
+    public static function _delete_data_for_all_users_in_context(\context $context) {
+    }
+
+    /**
+     * Delete all user data for the specified user, in the specified contexts.
+     *
+     * @param   approved_contextlist    $contextlist    The approved contexts and user information to delete information for.
+     */
+    public static function _delete_data_for_user(approved_contextlist $contextlist) {
     }
 }
