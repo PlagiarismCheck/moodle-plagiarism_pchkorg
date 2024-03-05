@@ -797,16 +797,12 @@ display: inline-block;"
 
         // Set the author and submitter.
         $submitter = $eventdata['userid'];
-        $author = (!empty($eventdata['relateduserid'])) ? $eventdata['relateduserid'] : $eventdata['userid'];
 
         // Related user ID will be NULL if an instructor submits on behalf of a student who is in a group.
         // To get around this, we get the group ID, get the group members and set the author as the first student in the group.
         if ((empty($eventdata['relateduserid'])) && ($eventdata['other']['modulename'] == 'assign')
             && has_capability('mod/assign:editothersubmission', $context, $submitter)) {
             $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id, groupid');
-            if (!empty($moodlesubmission->groupid)) {
-                $author = $this->get_first_group_author($cm->course, $moodlesubmission->groupid);
-            }
         }
 
         if ($eventdata['other']['modulename'] === 'forum'
@@ -976,7 +972,7 @@ display: inline-block;"
             $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id');
 
             $moodletextsubmission = $DB->get_record('assignsubmission_onlinetext',
-                array('submission' => $moodlesubmission->id), 'onlinetext');
+                array('submission' => $eventdata['objectid']), 'onlinetext');
 
             if ($moodletextsubmission) {
                 $eventdata['other']['content'] = $moodletextsubmission->onlinetext;
@@ -984,8 +980,8 @@ display: inline-block;"
 
             $filesconditions = array(
                 'component' => 'assignsubmission_file',
-                'itemid' => $moodlesubmission->id,
-                'userid' => $author
+                'itemid' => $eventdata['objectid'],
+                'userid' => $eventdata['userid']
             );
 
             $moodlefiles = $DB->get_records('files', $filesconditions);
