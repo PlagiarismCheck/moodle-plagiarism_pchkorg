@@ -94,6 +94,14 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         );
         $mform->setDefault('pchkorg_enabled_by_default', '1');
 
+        $mform->addElement(
+            'select',
+            'pchkorg_teacher_auto_registration',
+            get_string('pchkorg:teacherautoregistration', 'plagiarism_pchkorg'),
+            array(get_string('no'), get_string('yes'))
+        );
+        $mform->setDefault('pchkorg_teacher_auto_registration', '0');
+
         $this->add_action_buttons(true);
     }
 

@@ -1065,6 +1065,108 @@ display: inline-block;"
         return true;
     }
 
+    public function cron_auto_registrate_teachers() {
+        global $DB;
+
+        $configmodel = new plagiarism_pchkorg_config_model();
+        $enabled = $configmodel->get_system_config('pchkorg_use');
+        $isdebugenabled = $configmodel->get_system_config('pchkorg_enable_debug') === '1';
+        $apitoken = $configmodel->get_system_config('pchkorg_token');
+
+        // Plugin is disabled.
+        if ($enabled !== '1') {
+            if ($isdebugenabled) {
+                echo 'cron_auto_registrate_teachers: Plugin is disabled';
+            }
+            return true;
+        }
+        $isfeatureenabled = $configmodel->get_system_config('pchkorg_teacher_auto_registration');
+        // This feature is disabled.
+        if ($isfeatureenabled !== '1') {
+            if ($isdebugenabled) {
+                echo 'cron_auto_registrate_teachers: This feature is disabled.';
+            }
+            return true;
+        }
+
+        // Api token is empty.
+        if (empty($apitoken)) {
+            if ($isdebugenabled) {
+                echo 'cron_auto_registrate_teachers: Api token is empty.';
+            }
+            return true;
+        }
+        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+
+        // This SQL fetches all teachers in courses where plugin is enabled.
+        // And teachers not already imported.
+        $sql = 'SELECT u.email as email,
+                CONCAT(u.firstname, \' \', u.lastname) as name
+            FROM {user} u
+                INNER JOIN {user_enrolments} ue ON ue.userid = u.id
+                INNER JOIN {enrol} e ON e.id = ue.enrolid
+                INNER JOIN {context} ctx_user ON ctx_user.instanceid = u.id AND ctx_user.contextlevel = 30 -- CONTEXT_USER
+                INNER JOIN {role_assignments}  ON {role_assignments}.userid = u.id
+                INNER JOIN {role} ON {role_assignments}.roleid = {role}.id
+                INNER JOIN {context} ctx_course ON ctx_course.id = {role_assignments}.contextid AND ctx_course.contextlevel = 50 -- CONTEXT_COURSE
+            WHERE u.deleted = 0
+                AND {role}.shortname IN (
+                    \'manager\',
+                    \'coursecreator\',
+                    \'editingteacher\',
+                    \'teacher\'
+                )
+                AND e.courseid IN (
+                    SELECT DISTINCT {course}.id as emabled_in_course
+                    FROM {assign}
+                        INNER JOIN {course_modules} ON {course_modules}.instance = {assign}.id
+                        INNER JOIN {plagiarism_pchkorg_config} ON {plagiarism_pchkorg_config}.cm = {course_modules}.id
+                        INNER JOIN {course} ON {course}.id = {course_modules}.course AND {assign}.course = {course}.id
+                        INNER JOIN {modules} ON {modules}.id = {course_modules}.module
+                    WHERE {plagiarism_pchkorg_config}.value = 1
+                        AND {plagiarism_pchkorg_config}.name = \'pchkorg_module_use\'
+                        AND {modules}.name = \'assign\'
+                )  AND NOT EXISTS (SELECT 1 FROM {plagiarism_pchkorg_users} WHERE {plagiarism_pchkorg_users}.email = u.email LIMIT 1)
+            GROUP BY u.id
+            ORDER BY e.courseid DESC
+            LIMIT 50;';
+
+        $records = $DB->get_records_sql($sql);
+        foreach ($records as $record) {
+            // Small email validation.
+            if (\strpos($record->email, '@') === false) {
+                if ($isdebugenabled) {
+                    echo 'cron_auto_registrate_teachers: Email format is invalid.';
+                }
+                continue;
+            }
+            $member = $apiprovider->get_group_member_response($record->email);
+            // This feature is not available for this user. Stop here and disable this feature.
+            if (!$member->is_auto_registration_enabled) {
+                set_config('pchkorg_teacher_auto_registration', '0', 'plagiarism_pchkorg');
+                $configmodel->set_system_config('pchkorg_teacher_auto_registration', '0');
+                return false;
+            }
+            // User is already registered.
+            if ($member->is_member) {
+                $insertdata = new \stdClass;
+                $insertdata->email = $record->email;
+                $DB->insert_record('plagiarism_pchkorg_users', $insertdata);
+            } else {
+                // Send API request for registration. Number 2 mean role teacher.
+                $success = $apiprovider->auto_registrate_member($record->name, $record->email, 2);
+                // Operation is successful.
+                if ($success) {
+                    $insertdata = new \stdClass;
+                    $insertdata->email = $record->email;
+                    $DB->insert_record('plagiarism_pchkorg_users', $insertdata);
+                }
+            }
+        }
+
+        return true;
+    }
+
     /**
      *
      * Will find the first user in group assignment.

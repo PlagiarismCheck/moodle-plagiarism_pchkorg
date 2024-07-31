@@ -59,6 +59,7 @@ $string['pchkorg_debug_student_not_allowed_see_widget'] = 'Students can not see 
 $string['pchkorg_student_can_see_widget'] = 'Students can see a similarity score';
 $string['pchkorg_student_can_see_report'] = 'Students can access a similarity report';
 $string['pchkorg_check_ai'] = 'Enable AI Detector';
+$string['pchkorg:teacherautoregistration'] = 'Enable Teacher auto-registration';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>
@@ -84,10 +85,12 @@ $string['privacy:metadata:plagiarism_pchkorg_config:value'] = 'Value of option';
 $string['privacy:metadata:plagiarism_pchkorg'] = 'Service for originality check plagiarismcheck.org';
 $string['privacy:metadata:plagiarism_pchkorg:file'] =
         'Submission attachment for originality checkprivacy:metadata:plagiarism_pchkorg';
+$string['privacy:metadata:plagiarism_pchkorg_users:email'] = 'Emails of auto-registered teachers';
 $string['pchkorg:enable'] = 'Enable or Disable plugin';
 $string['privacy:metadata:core_files'] = 'We need a content of submission, for originality check';
-$string['sendqueuedsubmissions'] = '';
-$string['updatereportscores'] = '';
+$string['sendqueuedsubmissions'] = 'Send texts to check';
+$string['updatereportscores'] = 'Update check result';
+$string['autoregistrateteachers'] = 'Auto registration for teachers';
 $string['pchkorg_label_title'] = 'PlagiarismCheck.org ID: %s; Similarity Score: %s%%';
 $string['pchkorg_label_result'] = 'ID: %s Similarity: %s%%';
 $string['pchkorg_label_title_ai'] = 'PlagiarismCheck.org ID: %s; Similarity Score: %s%% AI: %s%%';

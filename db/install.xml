@@ -38,5 +38,15 @@
         <KEY NAME="cm" TYPE="foreign" FIELDS="cm" REFTABLE="course_modules" REFFIELDS="id"/>
       </KEYS>
     </TABLE>
+    <TABLE NAME="plagiarism_pchkorg_users" COMMENT="imported users">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="email" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="plagiarism_pchkorg_users_email" TYPE="unique" FIELDS="email"/>
+      </KEYS>
+    </TABLE>
   </TABLES>
 </XMLDB>

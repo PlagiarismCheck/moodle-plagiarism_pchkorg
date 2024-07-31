@@ -21,34 +21,37 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace plagiarism_pchkorg\task;
+
 defined('MOODLE_INTERNAL') || die();
 
-$tasks = array(
-    array(
-        'classname' => 'plagiarism_pchkorg\task\update_reports',
-        'blocking' => 0,
-        'minute' => '*',
-        'hour' => '*',
-        'day' => '*',
-        'dayofweek' => '*',
-        'month' => '*'
-    ),
-    array(
-        'classname' => 'plagiarism_pchkorg\task\send_submissions',
-        'blocking' => 0,
-        'minute' => '*',
-        'hour' => '*',
-        'day' => '*',
-        'dayofweek' => '*',
-        'month' => '*'
-    ),
-    array(
-        'classname' => 'plagiarism_pchkorg\task\auto_registrate_teachers',
-        'blocking' => 0,
-        'minute' => '*',
-        'hour' => '*/1',
-        'day' => '*',
-        'dayofweek' => '*',
-        'month' => '*'
-    ),
-);
+/**
+ * Teacher auto registration.
+ */
+class auto_registrate_teachers extends \core\task\scheduled_task {
+
+    /**
+     * Name of the task.
+     *
+     * @return string
+     * @throws \coding_exception
+     */
+    public function get_name() {
+        return get_string('autoregistrateteachers', 'plagiarism_pchkorg');
+    }
+
+    /**
+     * Task execution.
+     *
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    public function execute() {
+        global $CFG;
+
+        require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
+
+        $plugin = new \plagiarism_plugin_pchkorg();
+        $plugin->cron_auto_registrate_teachers();
+    }
+}
