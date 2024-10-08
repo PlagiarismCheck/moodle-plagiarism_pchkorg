@@ -412,7 +412,15 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         $where = new \stdClass();
         $where->cm = $cmid;
         if ($file === null) {
-            $where->signature = sha1($linkarray['content']);
+            if (!array_key_exists('content', $linkarray) && $component == 'qtype_essay' && !empty($linkarray['area'])) {
+                $questions = question_engine::load_questions_usage_by_activity($linkarray['area']);
+                $attempt = $questions->get_question_attempt($linkarray['itemid']);
+                $response = $attempt->get_response_summary();
+                $signature = sha1($response);
+            } else {
+                $signature = sha1($linkarray('content'));
+            }
+            $where->signature = $signature;
             $where->fileid = null;
         } else {
             $where->fileid = $file->get_id();
