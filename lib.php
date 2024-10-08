@@ -418,7 +418,7 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 $response = $attempt->get_response_summary();
                 $signature = sha1($response);
             } else {
-                $signature = sha1($linkarray('content'));
+                $signature = sha1($linkarray['content']);
             }
             $where->signature = $signature;
             $where->fileid = null;
