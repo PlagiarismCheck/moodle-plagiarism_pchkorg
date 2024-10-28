@@ -237,6 +237,9 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
         foreach ($records as $record) {
             if ($record->name === $field) {
                 $isfounded = true;
+                if (!isset($data->{$record->name}) || $data->{$record->name} === null) {
+                    $data->{$record->name} = 0;
+                }
                 if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
                     $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
                     break;
