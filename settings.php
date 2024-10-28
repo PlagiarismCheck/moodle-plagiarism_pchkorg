@@ -56,9 +56,10 @@ if (($data = $mform->get_data()) && confirm_sesskey()) {
     foreach ($data as $field => $value) {
         if (strpos($field, 'pchkorg') === 0) {
             if ('pchkorg_use' === $field) {
-                $field = 'enabled';
+                set_config('enabled', $value, 'plagiarism_pchkorg');
+            } else {
+                set_config($field, $value, 'plagiarism_pchkorg');
             }
-            set_config($field, $value, 'plagiarism_pchkorg');
             $pchkorgconfigmodel->set_system_config($field, $value);
         }
     }
