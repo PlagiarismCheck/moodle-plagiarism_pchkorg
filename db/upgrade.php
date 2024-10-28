@@ -88,5 +88,23 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2024072918, 'plagiarism', 'pchkorg');
     }
 
+    if ($oldversion < 2024102818) {
+        $configs = get_config('plagiarism');
+
+        foreach ($configs as $field => $value) {
+            if (strpos($field, 'pchkorg') === 0) {
+                if ($field === 'pchkorg_use') {
+                    $DB->delete_records('config_plugins', ['name' => $field, 'plugin' => 'plagiarism']);
+
+                    $field = 'enabled';
+                }
+
+                set_config($field, $value, 'plagiarism_pchkorg');
+            }
+        }
+
+        upgrade_plugin_savepoint(true, 2024102818, 'plagiarism', 'pchkorg');
+    }
+
     return true;
 }
