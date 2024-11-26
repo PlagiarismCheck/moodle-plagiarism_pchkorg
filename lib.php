@@ -93,6 +93,11 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             )) {
             $mform->setDefault('pchkorg_student_can_see_widget', 1);
         }
+        if (!isset($exportedvalues['pchkorg_check_ai']) || is_null(
+            $exportedvalues['pchkorg_check_ai']
+        )) {
+            $mform->setDefault('pchkorg_check_ai', 1);
+        }
 
         if (null === $cm) {
             if (!isset($exportedvalues['pchkorg_module_use'])
@@ -199,7 +204,6 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             get_string('pchkorg_check_ai', 'plagiarism_pchkorg'),
             array(get_string('no'), get_string('yes'))
         );
-        $mform->setDefault('pchkorg_check_ai', 1);
     }
 }
 
