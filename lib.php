@@ -1521,10 +1521,18 @@ display: inline-block;"
             if ($report !== null) {
                 $filedbnew = new stdClass();
                 $filedbnew->id = $filedb->id;
-                $filedbnew->state = 5;
                 $filedbnew->reportid = $report->id;
                 $filedbnew->score = $report->percent;
                 $filedbnew->scoreai = $report->percent_ai;
+                // successful check, all good.
+                if (5 === $report->state) {
+                    $filedbnew->state = 5;
+                } else {
+                    // Check has been failed for some reason. We cannot check this document.
+                    // We can mark this queue-item as failed and move to the next document.
+                    // 11 state will fail document in queue and hide it from the UI.
+                    $filedbnew->state = 11;
+                }
 
                 $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
             }

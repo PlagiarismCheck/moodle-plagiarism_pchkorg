@@ -593,12 +593,29 @@ class plagiarism_pchkorg_api_provider {
                         'Content-Type: application/x-www-form-urlencoded'
                 ),
         ));
+
+        /*
+             const STATE_CREATED = 1;
+             const STATE_STORED = 2;
+             const STATE_SUBMITTED = 3;
+             const STATE_FAILED = 4;
+             const STATE_CHECKED = 5;
+             const STATE_TEMP_FAILED = 6;
+             const STATE_DROPPED = 7;
+             const STATE_ERASED = 8;
+        */
         if ($json = json_decode($response)) {
-            if (isset($json->data) && 5 == $json->data->state) {
+            if (isset($json->data) && \in_array($json->data->state, array(4,5,6,7,8), true)) {
                 $result = new stdClass;
                 $result->id = $json->data->report->id;
-                $result->percent = $json->data->report->percent;
-                $result->percent_ai = $json->data->ai_report->processed_percent;
+                $result->state = $json->data->state;
+                if (5 === $json->data->state) {
+                    $result->percent = $json->data->report->percent;
+                    $result->percent_ai = $json->data->ai_report->processed_percent;
+                } else {
+                    $result->percent = null;
+                    $result->percent_ai = null;
+                }
 
                 return $result;
             }
