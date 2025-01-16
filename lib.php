@@ -1522,11 +1522,11 @@ display: inline-block;"
                 $filedbnew = new stdClass();
                 $filedbnew->id = $filedb->id;
                 $filedbnew->reportid = $report->id;
-                $filedbnew->score = $report->percent;
-                $filedbnew->scoreai = $report->percent_ai;
                 // successful check, all good.
                 if (5 === $report->state) {
                     $filedbnew->state = 5;
+                    $filedbnew->score = $report->percent;
+                    $filedbnew->scoreai = $report->percent_ai;
                 } else {
                     // Check has been failed for some reason. We cannot check this document.
                     // We can mark this queue-item as failed and move to the next document.
