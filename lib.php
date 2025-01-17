@@ -713,7 +713,6 @@ display: inline-block;"
 
         $formatoptions = new stdClass;
         $formatoptions->noclean = true;
-        $formatoptions->cmid = $cmid;
 
         $result .= '<div style="background-color: #d5ffd5; padding: 10px; border: 1px solid #b7dab7">';
         $result .= format_text(get_string('pchkorg_disclosure', 'plagiarism_pchkorg'), FORMAT_MOODLE, $formatoptions);
