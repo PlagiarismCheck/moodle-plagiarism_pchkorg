@@ -47,7 +47,7 @@ class plagiarism_pchkorg_api_provider {
      *
      * @var string|null
      */
-    private $lasterror;
+    private $lasterror = null;
 
     /**
      * Fetch last api error.
@@ -187,6 +187,7 @@ class plagiarism_pchkorg_api_provider {
                         ),
                 )
         );
+        $this->set_last_error(null);
         $id = null;
         if ($json = json_decode($response)) {
             if (isset($json->message)) {
@@ -307,6 +308,7 @@ class plagiarism_pchkorg_api_provider {
                         ),
                 )
         );
+        $this->set_last_error(null);
         $id = null;
         if ($json = json_decode($response)) {
             if (isset($json->message)) {

@@ -1480,7 +1480,10 @@ display: inline-block;"
                     $filedbnew->state = 12; // 12 - is SENT.
                 } else {
                     $filedbnew->attempt = $filedb->attempt + 1;
-                    if ($filedbnew->attempt > 6) {
+                    // When more than 6 attempts or we know concrete reason of failure.
+                    // There is no reasone to future attempt.
+                    $lasterrormessage = $apiprovider->get_last_error();
+                    if (!empty($lasterrormessage) || $filedbnew->attempt > 6) {
                         $filedbnew->state = 11; // Sending error.
                     }
                 }
