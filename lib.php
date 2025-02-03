@@ -1302,7 +1302,7 @@ display: inline-block;"
                                     $cm->id,
                                     $cm->name,
                                     $filedb->itemid,
-                                    null,
+                                    $signature,
                                     html_to_text($content, 75, false),
                                     'plain/text',
                                     sprintf('%s-quiz.txt', $filedb->itemid),
