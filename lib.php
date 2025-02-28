@@ -626,9 +626,11 @@ display: inline-block;"
             } else {
                 return $this->exit_message(
                     sprintf(
-                        '%s (%s)',
+                        '%s: [%s] %s',
                         get_string('pchkorg_debug_status_error', 'plagiarism_pchkorg'),
-                        $filerecord->state),
+                        $filerecord->state,
+                        empty($filerecord->message) ? '(empty)' : $filerecord->message
+                    ),
                     $isdebugenabled
                 );
             }
@@ -788,6 +790,7 @@ display: inline-block;"
         // Even if service is unavailable, method will try call only once.
         // Also, we don't use raw users email.
         $ismemberresponse = $apiprovider->get_group_member_response($USER->email);
+        $ismember = true;
         if (!$ismemberresponse->is_member) {
             if ($ismemberresponse->is_auto_registration_enabled) {
                 $name = $USER->firstname . ' ' . $USER->lastname;
@@ -802,10 +805,10 @@ display: inline-block;"
                     && !in_array('managerteacher', $roles);
                 $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
                 if (!$isregistered) {
-                    return true;
+                    $ismember = false;
                 }
             } else {
-                return true;
+                $ismember = false;
             }
         }
 
@@ -838,10 +841,18 @@ display: inline-block;"
                         $filerecord->cm = $cmid;
                         $filerecord->userid = $USER->id;
                         $filerecord->textid = null;
-                        $filerecord->state = 10;
                         $filerecord->created_at = time();
                         $filerecord->itemid = $eventdata['objectid'];
                         $filerecord->signature = $signature;
+                        if ($ismember) {
+                            $filerecord->state = 10;
+                        } else {
+                            $filerecord->message = sprintf(
+                                'User %s is not a member of group',
+                                $USER->email,
+                            );
+                            $filerecord->state = 11; // Sending error.
+                        }
 
                         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                     }
@@ -882,10 +893,18 @@ display: inline-block;"
                         $filerecord->cm = $cmid;
                         $filerecord->userid = $USER->id;
                         $filerecord->textid = null;
-                        $filerecord->state = 10;
                         $filerecord->created_at = time();
                         $filerecord->itemid = $eventdata['objectid'];
                         $filerecord->signature = $signature;
+                        if ($ismember) {
+                            $filerecord->state = 10;
+                        } else {
+                            $filerecord->message = sprintf(
+                                'User %s is not a member of group',
+                                $USER->email,
+                            );
+                            $filerecord->state = 11; // Sending error.
+                        }
 
                         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                     }
@@ -925,11 +944,18 @@ display: inline-block;"
                         $filerecord->cm = $cmid;
                         $filerecord->userid = $USER->id;
                         $filerecord->textid = null;
-                        $filerecord->state = 10;
                         $filerecord->created_at = time();
                         $filerecord->itemid = $eventdata['objectid'];
                         $filerecord->signature = $signature;
-
+                        if ($ismember) {
+                            $filerecord->state = 10;
+                        } else {
+                            $filerecord->message = sprintf(
+                                'User %s is not a member of group',
+                                $USER->email,
+                            );
+                            $filerecord->state = 11; // Sending error.
+                        }
                         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                     }
                     foreach ($attachments as $pathnamehash => $file) {
@@ -965,11 +991,18 @@ display: inline-block;"
                             $filerecord->cm = $cmid;
                             $filerecord->userid = $USER->id;
                             $filerecord->textid = null;
-                            $filerecord->state = 10;
                             $filerecord->created_at = time();
                             $filerecord->itemid = $eventdata['objectid'];
                             $filerecord->signature = $signature;
-
+                            if ($ismember) {
+                                $filerecord->state = 10;
+                            } else {
+                                $filerecord->message = sprintf(
+                                    'User %s is not a member of group',
+                                    $USER->email,
+                                );
+                                $filerecord->state = 11; // Sending error.
+                            }
                             $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                         }
                     }
@@ -1032,11 +1065,18 @@ display: inline-block;"
                     $filerecord->cm = $cmid;
                     $filerecord->userid = $USER->id;
                     $filerecord->textid = null;
-                    $filerecord->state = 10;
                     $filerecord->created_at = time();
                     $filerecord->itemid = $eventdata['objectid'];
                     $filerecord->signature = sha1($content);
-
+                    if ($ismember) {
+                        $filerecord->state = 10;
+                    } else {
+                        $filerecord->message = sprintf(
+                            'User %s is not a member of group',
+                            $USER->email,
+                        );
+                        $filerecord->state = 11; // Sending error.
+                    }
                     $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                 }
             }
@@ -1068,11 +1108,18 @@ display: inline-block;"
             $filerecord->cm = $cmid;
             $filerecord->userid = $USER->id;
             $filerecord->textid = null;
-            $filerecord->state = 10;
             $filerecord->created_at = time();
             $filerecord->itemid = $eventdata['objectid'];
             $filerecord->signature = $signature;
-
+            if ($ismember) {
+                $filerecord->state = 10;
+            } else {
+                $filerecord->message = sprintf(
+                    'User %s is not a member of group',
+                    $USER->email,
+                );
+                $filerecord->state = 11; // Sending error.
+            }
             $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
         }
 
@@ -1483,7 +1530,16 @@ display: inline-block;"
                     // When more than 6 attempts or we know concrete reason of failure.
                     // There is no reasone to future attempt.
                     $lasterrormessage = $apiprovider->get_last_error();
-                    if (!empty($lasterrormessage) || $filedbnew->attempt > 6) {
+                    if (!empty($lasterrormessage)) {
+                        $apiprovider->set_last_error(null);
+                        // Database column has maximum length 130 characters.
+                        if (strlen($lasterrormessage) > 130) {
+                            $lasterrormessage = substr($lasterrormessage, 0, 130);
+                        }
+                        $filedbnew->message = $lasterrormessage;
+                        $filedbnew->state = 11; // Sending error.
+                    }
+                    if ($filedbnew->attempt > 6) {
                         $filedbnew->state = 11; // Sending error.
                     }
                 }

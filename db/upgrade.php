@@ -106,5 +106,19 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2024102818, 'plagiarism', 'pchkorg');
     }
 
+    if ($oldversion < 2025022717) {
+        $table = new xmldb_table('plagiarism_pchkorg_files');
+
+        $field = new xmldb_field('message');
+        $field->set_attributes(XMLDB_TYPE_CHAR, '130', null, null, null, null, null, null);
+        $field->setComment('Message with error');
+
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_plugin_savepoint(true, 2025022717, 'plagiarism', 'pchkorg');
+    }
+
     return true;
 }
