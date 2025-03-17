@@ -448,6 +448,18 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             $img = new moodle_url('/plagiarism/pchkorg/pix/icon.png');
             $imgsrc = $img->__toString();
 
+            if (array_key_exists('forum', $linkarray)
+                && $isstudent
+                && $filerecord->userid !== $USER->id) {
+                    return $this->exit_message(
+                        sprintf(
+                            '%s (%s)',
+                            get_string('pchkorg_debug_student_not_allowed_see_widget', 'plagiarism_pchkorg'),
+                            $USER->email),
+                        $isdebugenabled
+                    );
+            }
+
             // Text had been successfully checked.
             if ($filerecord->state == 5) {
                 $action = $apiprovider->get_report_action($filerecord->textid);
