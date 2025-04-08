@@ -448,7 +448,7 @@ class plagiarism_pchkorg_api_provider {
      */
     public function user_email_to_hash($email) {
         // We don't send raw user email to the service.
-        return hash('sha256', $this->token . strtolower($email));
+        return hash('sha256', trim($this->token) . trim(strtolower($email)));
     }
 
     /**
