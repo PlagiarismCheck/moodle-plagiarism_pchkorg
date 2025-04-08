@@ -60,6 +60,9 @@ if (($data = $mform->get_data()) && confirm_sesskey()) {
             } else {
                 set_config($field, $value, 'plagiarism_pchkorg');
             }
+            if ('pchkorg_token' === $field) {
+                $value = trim($value);
+            }
             $pchkorgconfigmodel->set_system_config($field, $value);
         }
     }
