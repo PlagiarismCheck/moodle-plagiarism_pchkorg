@@ -181,6 +181,7 @@ class plagiarism_pchkorg_api_provider {
                 ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
+                        'CURLOPT_TIMEOUT' => 50,
                         'CURLOPT_HTTPHEADER' => array(
                                 'X-API-TOKEN: ' . $this->generate_api_token(),
                                 'Content-Type: multipart/form-data; boundary=' . $boundary
@@ -301,6 +302,7 @@ class plagiarism_pchkorg_api_provider {
                 ),
                 array(
                         'CURLOPT_RETURNTRANSFER' => true,
+                        'CURLOPT_TIMEOUT' => 50,
                         'CURLOPT_POST' => true,
                         'CURLOPT_HTTPHEADER' => array(
                                 'X-API-TOKEN: ' . $this->generate_api_token(),
@@ -561,7 +563,7 @@ class plagiarism_pchkorg_api_provider {
         ), array(
                 'CURLOPT_RETURNTRANSFER' => true,
             // The maximum number of seconds to allow cURL functions to execute.
-                'CURLOPT_TIMEOUT' => 8
+                'CURLOPT_TIMEOUT' => 30
         ));
 
 
@@ -589,6 +591,7 @@ class plagiarism_pchkorg_api_provider {
         $curl = new curl();
         $response = $curl->get($this->endpoint . '/api/v1/text/' . $textid, array(), array(
                 'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_TIMEOUT' => 30,
                 'CURLOPT_POST' => false,
                 'CURLOPT_HTTPHEADER' => array(
                         'X-API-TOKEN: ' . $this->generate_api_token(),
@@ -639,6 +642,7 @@ class plagiarism_pchkorg_api_provider {
                 'token' => $this->token
         ), array(
                 'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_TIMEOUT' => 30,
                 'CURLOPT_POST' => false,
                 'CURLOPT_HTTPHEADER' => array(
                         'Content-Type: application/x-www-form-urlencoded'
