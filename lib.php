@@ -475,8 +475,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                         $filerecord->scoreai
                     );
                     $label = sprintf(
-                        get_string('pchkorg_label_result_ai', 'plagiarism_pchkorg'), 
-                        $filerecord->textid, 
+                        get_string('pchkorg_label_result_ai', 'plagiarism_pchkorg'),
+                        $filerecord->textid,
                         $score,
                         $filerecord->scoreai
                     );
@@ -487,8 +487,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                         $score
                     );
                     $label = sprintf(
-                        get_string('pchkorg_label_result', 'plagiarism_pchkorg'), 
-                        $filerecord->textid, 
+                        get_string('pchkorg_label_result', 'plagiarism_pchkorg'),
+                        $filerecord->textid,
                         $score
                     );
                 }
@@ -814,7 +814,20 @@ display: inline-block;"
                 // Moodle has multiple roles in courses.
                 $isstudent = !in_array('teacher', $roles)
                     && !in_array('editingteacher', $roles)
-                    && !in_array('managerteacher', $roles);
+                    && !in_array('managerteacher', $roles)
+                    // Popular custom teacher roles.
+                    && !in_array('l', $roles)
+                    && !in_array('ta', $roles)
+                    && !in_array('cce', $roles)
+                    && !in_array('hod', $roles)
+                    && !in_array('cl', $roles)
+                    && !in_array('ca', $roles)
+                    && !in_array('lib', $roles)
+                    && !in_array('led', $roles)
+                    && !in_array('id', $roles)
+                    && !in_array('adt1', $roles)
+                    && !in_array('adt1tii', $roles)
+                    && !in_array('manager', $roles);
                 $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
                 if (!$isregistered) {
                     $ismember = false;
@@ -1187,7 +1200,19 @@ display: inline-block;"
                     \'manager\',
                     \'coursecreator\',
                     \'editingteacher\',
-                    \'teacher\'
+                    \'teacher\',
+                    \'l\',
+                    \'ta\',
+                    \'cce\',
+                    \'hod\',
+                    \'cl\',
+                    \'ca\',
+                    \'lib\',
+                    \'led\',
+                    \'id\',
+                    \'adt1\',
+                    \'adt1tii\',
+                    \'manager\'
                 )
                 AND e.courseid IN (
                     SELECT DISTINCT {course}.id as emabled_in_course
