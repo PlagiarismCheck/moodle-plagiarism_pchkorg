@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<ruleset name="plagiarism_pchkorg">
+    <description>Official Moodle coding style, with exceptions for compatibility constructs.</description>
+
+    <rule ref="moodle"/>
+
+    <!--
+        classes/privacy/provider.php supports the whole Moodle 3.9 to 5.2 range and
+        uses core's own compatibility mechanisms to do it, which the coding standard
+        cannot recognise:
+
+        - the core_privacy legacy_polyfill trait dispatches to method names prefixed
+          with an underscore, so renaming them would break the Privacy API
+        - my_userlist is declared twice behind an interface_exists() check, so that
+          the plugin still loads where core's userlist interface does not exist
+
+        Both are deliberate. The exclusions are scoped to this one file so the rest
+        of the plugin is still held to the full standard.
+    -->
+    <rule ref="PSR2.Methods.MethodDeclaration.Underscore">
+        <exclude-pattern>classes/privacy/provider\.php</exclude-pattern>
+    </rule>
+    <rule ref="PSR1.Classes.ClassDeclaration.MultipleClasses">
+        <exclude-pattern>classes/privacy/provider\.php</exclude-pattern>
+    </rule>
+    <rule ref="Generic.Classes.DuplicateClassName.Found">
+        <exclude-pattern>classes/privacy/provider\.php</exclude-pattern>
+    </rule>
+    <rule ref="PSR12.Classes.ClosingBrace.StatementAfter">
+        <exclude-pattern>classes/privacy/provider\.php</exclude-pattern>
+    </rule>
+    <rule ref="moodle.Commenting.MissingDocblock.Interface">
+        <exclude-pattern>classes/privacy/provider\.php</exclude-pattern>
+    </rule>
+
+    <!--
+        plagiarism_pchkorg_ignore_template_filemanager::toHtml() overrides
+        MoodleQuickForm_filemanager::toHtml(), a PEAR/QuickForm-derived base
+        class method whose name is fixed by the framework, not by this plugin.
+    -->
+    <rule ref="moodle.NamingConventions.ValidFunctionName.LowercaseMethod">
+        <exclude-pattern>classes/ignore_template_filemanager\.php</exclude-pattern>
+    </rule>
+</ruleset>

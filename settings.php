@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Site-wide administration settings.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -48,7 +50,6 @@ if ($mform->is_cancelled()) {
 echo $OUTPUT->header();
 
 if (($data = $mform->get_data()) && confirm_sesskey()) {
-
     if (!isset($data->pchkorg_use)) {
         $data->pchkorg_use = 0;
     }
@@ -67,6 +68,22 @@ if (($data = $mform->get_data()) && confirm_sesskey()) {
         }
     }
     $OUTPUT->notification(get_string('savedconfigsuccess', 'plagiarism_pchkorg'), 'notifysuccess');
+
+    // Validate the token once, here, and nowhere else: not on page load, not
+    // per assignment edit, not in scheduled tasks. The three outcomes are kept
+    // apart so an unreachable service is never reported as a bad token.
+    $submittedtoken = isset($data->pchkorg_token) ? trim($data->pchkorg_token) : '';
+    if ('' !== $submittedtoken) {
+        $apiprovider = new plagiarism_pchkorg_api_provider($submittedtoken);
+        $validation = $apiprovider->validate_token();
+        if ($validation->ok) {
+            echo $OUTPUT->notification(get_string('pchkorg_token_valid', 'plagiarism_pchkorg'), 'notifysuccess');
+        } else if (!$validation->reachable) {
+            echo $OUTPUT->notification(get_string('pchkorg_token_unavailable', 'plagiarism_pchkorg'), 'notifyproblem');
+        } else {
+            echo $OUTPUT->notification(get_string('pchkorg_token_invalid', 'plagiarism_pchkorg'), 'notifyproblem');
+        }
+    }
 }
 
 $plagiarismsettings = $pchkorgconfigmodel->get_all_system_config();

@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Plugin version and dependency declarations.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -26,11 +28,11 @@ defined('MOODLE_INTERNAL') || die();
 if (!isset($plugin)) {
     $plugin = new stdClass();
 }
-$plugin->version = 2026051216;
+$plugin->version = 2026080600;
 $plugin->requires = 2020061501; // Requires Moodle 3.9 .
-$plugin->release = 'v3.15.21';
+$plugin->release = 'v3.16.1';
 $plugin->component = 'plagiarism_pchkorg';
 $plugin->maturity = MATURITY_STABLE;
-$plugin->dependencies = array(
+$plugin->dependencies = [
         'mod_assign' => ANY_VERSION,
-);
+];

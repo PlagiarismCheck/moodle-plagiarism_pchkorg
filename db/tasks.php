@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Scheduled task registration.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -23,32 +25,32 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$tasks = array(
-    array(
+$tasks = [
+    [
         'classname' => 'plagiarism_pchkorg\task\update_reports',
         'blocking' => 0,
         'minute' => '*',
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
-    ),
-    array(
+        'month' => '*',
+    ],
+    [
         'classname' => 'plagiarism_pchkorg\task\send_submissions',
         'blocking' => 0,
         'minute' => '*',
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
-    ),
-    array(
+        'month' => '*',
+    ],
+    [
         'classname' => 'plagiarism_pchkorg\task\auto_registrate_teachers',
         'blocking' => 0,
         'minute' => '*',
         'hour' => '*/1',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
-    ),
-);
+        'month' => '*',
+    ],
+];

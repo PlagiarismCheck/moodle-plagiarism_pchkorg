@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -17,6 +16,13 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Backup support for the plugin.
+ *
+ * @package   plagiarism_pchkorg
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class backup_plagiarism_pchkorg_plugin extends backup_plagiarism_plugin {
     /**
      * define_module_plugin_structure
@@ -34,19 +40,19 @@ class backup_plagiarism_pchkorg_plugin extends backup_plagiarism_plugin {
         $plugin->add_child($pluginwrapper);
 
         $configs = new backup_nested_element('pchkorg_activities_configs');
-        $config = new backup_nested_element('pchkorg_activities_config', array('id'), array('name', 'value'));
+        $config = new backup_nested_element('pchkorg_activities_config', ['id'], ['name', 'value']);
         $pluginwrapper->add_child($configs);
         $configs->add_child($config);
-        $config->set_source_table('plagiarism_pchkorg_config', array('cm' => backup::VAR_PARENTID));
+        $config->set_source_table('plagiarism_pchkorg_config', ['cm' => backup::VAR_PARENTID]);
 
         // Now information about files to module.
         $files = new backup_nested_element('pchkorg_files');
-        $file = new backup_nested_element('pchkorg_file', array('id'), array(
-            'cm', 'fileid', 'userid', 
-            'state', 'score', 'created_at', 
-            'textid', 'reportid', 'signature', 
-            'attempt', 'itemid'
-        ));
+        $file = new backup_nested_element('pchkorg_file', ['id'], [
+            'cm', 'fileid', 'userid',
+            'state', 'score', 'created_at',
+            'textid', 'reportid', 'signature',
+            'attempt', 'itemid',
+        ]);
 
         $pluginwrapper->add_child($files);
         $files->add_child($file);
@@ -54,7 +60,7 @@ class backup_plagiarism_pchkorg_plugin extends backup_plagiarism_plugin {
         // To know if we are including userinfo.
         $userinfo = $this->get_setting_value('userinfo');
         if ($userinfo) {
-            $file->set_source_table('plagiarism_pchkorg_files', array('cm' => backup::VAR_PARENTID));
+            $file->set_source_table('plagiarism_pchkorg_files', ['cm' => backup::VAR_PARENTID]);
         }
 
         return $plugin;
@@ -71,12 +77,12 @@ class backup_plagiarism_pchkorg_plugin extends backup_plagiarism_plugin {
         $plugin->add_child($pluginwrapper);
 
         $configs = new backup_nested_element('pchkorg_configs');
-        $config = new backup_nested_element('pchkorg_config', array('id'), array('plugin', 'name', 'value'));
+        $config = new backup_nested_element('pchkorg_config', ['id'], ['plugin', 'name', 'value']);
         $pluginwrapper->add_child($configs);
         $configs->add_child($config);
-        $config->set_source_table('config_plugins', array(
+        $config->set_source_table('config_plugins', [
             'name' => backup::VAR_PARENTID, 'plugin' => backup_helper::is_sqlparam('plagiarism'),
-        ));
+        ]);
 
         return $plugin;
     }

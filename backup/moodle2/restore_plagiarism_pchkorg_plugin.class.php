@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -17,8 +16,17 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Restore support for the plugin.
+ *
+ * @package   plagiarism_pchkorg
+ * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
-
+    /**
+     * Restore one site-level configuration row.
+     */
     public function process_pchkorg_config($data) {
         $data = (object) $data;
 
@@ -26,6 +34,18 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
     }
 
 
+    /**
+
+
+     * Restore one per-activity configuration row.
+
+
+     */
+
+
+    /**
+     * Process pchkorgconfigmod.
+     */
     public function process_pchkorgconfigmod($data) {
         global $DB;
 
@@ -35,6 +55,15 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
         $DB->insert_record('plagiarism_pchkorg_config', $data);
     }
 
+    /**
+
+     * Restore one queued submission record.
+
+     */
+
+    /**
+     * Process pchkorgfiles.
+     */
     public function process_pchkorgfiles($data) {
         global $DB;
 
@@ -46,11 +75,23 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
     }
 
 
+    /**
+
+
+     * Declare what is restored at course level.
+
+
+     */
+
+
+    /**
+     * Define course plugin structure.
+     */
     protected function define_course_plugin_structure() {
-        $paths = array();
+        $paths = [];
 
         $elename = 'pchkorg_config';
-        $elepath = $this->get_pathfor('/pchkorg_configs/pchkorg_config'); 
+        $elepath = $this->get_pathfor('/pchkorg_configs/pchkorg_config');
 
         $paths[] = new restore_path_element($elename, $elepath);
 
@@ -58,8 +99,20 @@ class restore_plagiarism_pchkorg_plugin extends restore_plagiarism_plugin {
     }
 
 
+    /**
+
+
+     * Declare what is restored at activity level.
+
+
+     */
+
+
+    /**
+     * Define module plugin structure.
+     */
     protected function define_module_plugin_structure() {
-        $paths = array();
+        $paths = [];
 
         $elename = 'pchkorgconfigmod';
         $elepath = $this->get_pathfor('/pchkorg_activities_configs/pchkorg_activities_config');

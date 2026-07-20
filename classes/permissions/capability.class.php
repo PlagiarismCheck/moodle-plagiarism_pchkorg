@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Names of the capabilities this plugin defines.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -30,6 +32,9 @@ if (!defined('MOODLE_INTERNAL')) {
     die('Direct access to this script is forbidden.'); // It must be included from a Moodle page.
 }
 
+/**
+ * Capability names defined by this plugin.
+ */
 class capability {
     /**
      * ENABLE

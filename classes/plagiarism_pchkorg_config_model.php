@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Accessor for site-wide and per-activity settings.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -27,6 +29,36 @@ defined('MOODLE_INTERNAL') || die();
  * Class plagiarism_pchkorg_config_model
  */
 class plagiarism_pchkorg_config_model {
+    /**
+     * Per-request query caches, one entry per caching method.
+     *
+     * These live on the class rather than inside each method so that they are
+     * shared across every instance for the life of the request, which is what
+     * keeps a grading page listing hundreds of submissions down to one query
+     * per setting, while still being clearable. Tests must call reset_caches()
+     * between cases, since a function-level static would outlive the database
+     * reset and silently serve stale configuration.
+     *
+     * @var array
+     */
+    private static $caches = [
+        'is_enabled_for_module' => [],
+        'show_widget_for_student' => [],
+        'show_report_for_student' => [],
+        'get_system_config' => [],
+        'get_all_system_config' => [],
+    ];
+
+    /**
+     * Discard every cached lookup.
+     *
+     * @return void
+     */
+    public static function reset_caches() {
+        foreach (array_keys(self::$caches) as $name) {
+            self::$caches[$name] = [];
+        }
+    }
 
     /**
      *
@@ -39,13 +71,13 @@ class plagiarism_pchkorg_config_model {
     public function is_enabled_for_module($module) {
         global $DB;
 
-        static $resultmap = array();
+        $resultmap = &self::$caches['is_enabled_for_module'];
         // This will be called only once per module.
         if (!array_key_exists($module, $resultmap)) {
-            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+            $configs = $DB->get_records('plagiarism_pchkorg_config', [
                     'cm' => $module,
-                    'name' => 'pchkorg_module_use'
-            ));
+                    'name' => 'pchkorg_module_use',
+            ]);
 
             $enabled = false;
             foreach ($configs as $record) {
@@ -75,13 +107,13 @@ class plagiarism_pchkorg_config_model {
     public function show_widget_for_student($module) {
         global $DB;
 
-        static $resultmap = array();
+        $resultmap = &self::$caches['show_widget_for_student'];
         // This will be called only once per module.
         if (!array_key_exists($module, $resultmap)) {
-            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+            $configs = $DB->get_records('plagiarism_pchkorg_config', [
                 'cm' => $module,
-                'name' => 'pchkorg_student_can_see_widget'
-            ));
+                'name' => 'pchkorg_student_can_see_widget',
+            ]);
 
             $enabled = null;
             foreach ($configs as $record) {
@@ -111,13 +143,13 @@ class plagiarism_pchkorg_config_model {
     public function show_report_for_student($module) {
         global $DB;
 
-        static $resultmap = array();
+        $resultmap = &self::$caches['show_report_for_student'];
         // This will be called only once per module.
         if (!array_key_exists($module, $resultmap)) {
-            $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+            $configs = $DB->get_records('plagiarism_pchkorg_config', [
                 'cm' => $module,
-                'name' => 'pchkorg_student_can_see_report'
-            ));
+                'name' => 'pchkorg_student_can_see_report',
+            ]);
 
             $enabled = null;
             foreach ($configs as $record) {
@@ -147,10 +179,10 @@ class plagiarism_pchkorg_config_model {
     public function get_filter_for_module($module, $name) {
         global $DB;
 
-        $configs = $DB->get_records('plagiarism_pchkorg_config', array(
+        $configs = $DB->get_records('plagiarism_pchkorg_config', [
             'cm' => $module,
             'name' => $name,
-        ));
+        ]);
 
         $value = null;
         foreach ($configs as $record) {
@@ -173,20 +205,25 @@ class plagiarism_pchkorg_config_model {
     public function set_system_config($name, $value) {
         global $DB;
 
-        $DB->delete_records('plagiarism_pchkorg_config', array(
+        $DB->delete_records('plagiarism_pchkorg_config', [
                 'cm' => 0,
                 'name' => $name,
-        ));
+        ]);
 
         $record = new \stdClass();
-        $record->cn = 0;
+        $record->cm = 0;
         $record->name = $name;
         $record->value = $value;
 
         $DB->insert_record('plagiarism_pchkorg_config', $record);
+
+        // Otherwise a read later in the same request returns the old value.
+        self::reset_caches();
     }
 
     /**
+     * Get system config.
+     *
      * @param $name
      * @return |null
      */
@@ -194,12 +231,12 @@ class plagiarism_pchkorg_config_model {
         global $DB;
 
         // SQL query will be called only one per one setting name.
-        static $resultsmap = array();
+        $resultsmap = &self::$caches['get_system_config'];
         if (!array_key_exists($name, $resultsmap)) {
-            $records = $DB->get_records('plagiarism_pchkorg_config', array(
+            $records = $DB->get_records('plagiarism_pchkorg_config', [
                     'cm' => 0,
                     'name' => $name,
-            ));
+            ]);
             $resultsmap[$name] = null;
             foreach ($records as $record) {
                 $resultsmap[$name] = $record->value;
@@ -220,11 +257,11 @@ class plagiarism_pchkorg_config_model {
     public function get_all_system_config() {
         global $DB;
 
-        static $map = array();
+        $map = &self::$caches['get_all_system_config'];
         if (empty($map)) {
-            $records = $DB->get_records('plagiarism_pchkorg_config', array(
+            $records = $DB->get_records('plagiarism_pchkorg_config', [
                     'cm' => 0,
-            ));
+            ]);
 
             foreach ($records as $record) {
                 $map[$record->name] = $record->value;

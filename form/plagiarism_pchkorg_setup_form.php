@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Site settings form.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -27,7 +29,6 @@ defined('MOODLE_INTERNAL') || die();
  * Class defined plugin settings form.
  */
 class plagiarism_pchkorg_setup_form extends moodleform {
-
     /**
      *
      * Method defined plugin settings form.
@@ -39,10 +40,10 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform = &$this->_form;
 
         $mform->addElement(
-                'select',
-                'pchkorg_use',
-                get_string('pchkorg_use', 'plagiarism_pchkorg'),
-                array(get_string('no'), get_string('yes'))
+            'select',
+            'pchkorg_use',
+            get_string('pchkorg_use', 'plagiarism_pchkorg'),
+            [get_string('no'), get_string('yes')]
         );
         $mform->addHelpButton('pchkorg_use', 'pchkorg_use', 'plagiarism_pchkorg');
 
@@ -53,9 +54,22 @@ class plagiarism_pchkorg_setup_form extends moodleform {
 
         $mform->addElement(
             'select',
+            'pchkorg_enable_ignore_templates',
+            get_string('pchkorg_enable_ignore_templates', 'plagiarism_pchkorg'),
+            [get_string('no'), get_string('yes')]
+        );
+        $mform->addHelpButton(
+            'pchkorg_enable_ignore_templates',
+            'pchkorg_enable_ignore_templates',
+            'plagiarism_pchkorg'
+        );
+        $mform->setDefault('pchkorg_enable_ignore_templates', '0');
+
+        $mform->addElement(
+            'select',
             'pchkorg_enable_debug',
             get_string('pchkorg_enable_debug', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
         $mform->addHelpButton('pchkorg_enable_debug', 'pchkorg_enable_debug', 'plagiarism_pchkorg');
 
@@ -76,21 +90,21 @@ class plagiarism_pchkorg_setup_form extends moodleform {
             'select',
             'pchkorg_enable_quiz',
             get_string('pchkorg_enable_quiz', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_enable_forum',
             get_string('pchkorg_enable_forum', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_enabled_by_default',
             get_string('pchkorg:enabledbydefault', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
         $mform->setDefault('pchkorg_enabled_by_default', '1');
 
@@ -98,11 +112,10 @@ class plagiarism_pchkorg_setup_form extends moodleform {
             'select',
             'pchkorg_teacher_auto_registration',
             get_string('pchkorg:teacherautoregistration', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
         $mform->setDefault('pchkorg_teacher_auto_registration', '0');
 
         $this->add_action_buttons(true);
     }
-
 }

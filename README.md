@@ -1,54 +1,147 @@
-Plagiarism Check Plugin. [![Build Status](https://travis-ci.org/PlagiarismCheck/moodle-plagiarism_pchkorg.svg?branch=master)](https://travis-ci.org/PlagiarismCheck/moodle-plagiarism_pchkorg)
----------------------
-This plugin provide functionality for Plagiarismcheck.org service.
+# PlagiarismCheck.org plugin for Moodle
 
-Plagiarismcheck.org is a sophisticated similarity search engine. 
-We advocate for bringing technology into academics to help instructors save time and motivate students write better papers. 
+This is the official Moodle plagiarism plugin for
+[PlagiarismCheck.org](https://plagiarismcheck.org/). It sends supported Moodle
+submissions to the PlagiarismCheck.org SaaS service and displays similarity and
+AI-detection scores in Moodle, with links to detailed reports.
 
-PlagiarismCheck.org has subscription-based pricing model. More information is available here.  
+The plugin can check:
 
-http://plagiarismcheck.org
+- Assignment file submissions and online text
+- Forum posts, when enabled by an administrator
+- Essay responses in Quizzes, when enabled by an administrator
 
-### With PlagiarismCheck you get:
+## Features
 
-1) AI Algorithm.
+- Similarity checking against internet sources and the databases available in
+  your PlagiarismCheck.org plan
+- Optional AI-content detection
+- Detailed reports with highlighted matches and links to detected sources
+- Per-activity controls for excluding self-plagiarism, references, quotes, and
+  sources below a chosen similarity threshold
+- Separate controls for whether students can see scores and access reports
+- Automatic processing through Moodle scheduled tasks
+- Moodle Privacy API support
 
-    The algorithm that searches not only for word-to-word match, but also covers: 
-    * word rearrangements 
-    * word substitutions / synonymization
-    * changes from passive to active voice 
-    * poor paraphrasing 
-    * changes of alphabet from Latin to Cyrillic and vice versa 
-    how_we_detect
+Available features and search sources may depend on your PlagiarismCheck.org
+subscription.
 
-2) Smart report.
+## Requirements
 
-    * user can access all sources where similarity has been detected
-    * similarity found in quotes are highlighted in a different color and can be included/excluded from the total similarity percentage 
-    * similarity found in references are highlighted in a different color and can be included/excluded from the total similarity percentage
+- Moodle 3.9, 3.10, 3.11, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 5.0, 5.1, or 5.2
+- PHP 7.2 through 8.4, within whichever range your Moodle release supports
+- A PlagiarismCheck.org institutional account and API token
+- Moodle cron configured and running regularly
+- Outbound HTTPS access to `plagiarismcheck.org`
 
-3) Search database.
+The integration plugin is free to install. Use of the PlagiarismCheck.org SaaS
+service requires an appropriate subscription. See
+[PlagiarismCheck.org pricing](https://plagiarismcheck.org/pricing/) or contact
+[support@plagiarismcheck.org](mailto:support@plagiarismcheck.org) for account
+and token assistance.
 
-    Depending on the type of subscription, there are several search options available: 
-    * search via all publicly available resources
-    * create a personal archive for your school and search through it
-    * search in closed depositories and libraries
+## Installation
 
-4) Usability.
-    * integration can be easily set up by an administrator of a Moodle account 
-    * integration gives a chance to set up who will have an access to the software 
-    * though the integration both students and instructors will have an access to the similarity reports 
-5) Resubmissions.
+### Install from a ZIP package
 
-    In case an instructor allows to resubmit works, PlagiarismCheck will be able to check all submissions without giving a false positive result 
+1. Download the plugin ZIP from the
+   [Moodle Plugins directory](https://marketplace.moodle.com/plugins/plagiarism_pchkorg).
+2. In Moodle, go to **Site administration > Plugins > Install plugins**.
+3. Upload the ZIP package and complete Moodle's validation and database upgrade
+   steps.
 
-6) Throughput 
-    * no restrictions on daily usage 
-    * minimum downtime 
-    * no limitations on how soon one can resubmit a work 
+### Install manually
 
-7) Excellent customer service
-response to clients' requests within 24 hours
-24/7 admin support.
+Place the plugin source in:
 
+```text
+<moodle-root>/plagiarism/pchkorg
+```
 
+Then sign in as an administrator and visit **Site administration >
+Notifications** to complete the installation.
+
+## Configuration
+
+1. Sign in to PlagiarismCheck.org and obtain the API token from **Profile >
+   Integrations > Moodle > Connect**. If the integration is not available for
+   your account, contact support.
+2. In Moodle, open the **PlagiarismCheck.org plugin** settings under **Site
+   administration > Plugins > Plagiarism**. On some Moodle versions, open
+   **Manage plagiarism plugins** first and then follow the plugin's settings
+   link.
+3. Set **Enable plugin** to **Yes**, enter the API token, choose the global
+   defaults, and save the changes.
+4. Confirm that Moodle cron runs regularly. Submission upload and report updates
+   are handled by scheduled tasks.
+
+Administrators can also enable support for Forums and Quizzes, choose whether
+new activities use the plugin by default, set a minimum source-similarity
+threshold, and configure teacher auto-registration where supported by the
+institutional account.
+
+## Using the plugin
+
+When creating or editing a supported activity, expand the
+**PlagiarismCheck.org plugin** section and enable the plugin for that activity.
+The activity settings let instructors configure:
+
+- The minimum similarity percentage for sources included in the result
+- Whether to exclude self-plagiarism
+- Whether references and quotes are included
+- Whether students can see similarity scores and open reports
+- Whether AI detection is enabled
+
+After a student submits work, Moodle queues it for processing. A similarity
+score, an AI score when enabled, and a report link appear after the scheduled
+tasks receive the result from PlagiarismCheck.org.
+
+### Ignored activity templates
+
+An administrator can enable **activity template exclusion**, which requires an
+institutional API token. Instructors can then attach template material — the task
+description, a rubric, a coversheet, a question sheet — to an activity, either as
+uploaded files or as pasted text, while creating it or later in its settings.
+
+Text in a student submission that matches a template is forced to count as
+original and as not AI generated, so wording every student is expected to repeat
+does not raise their scores. The submission itself is never altered. Templates
+apply to submissions checked from then on; reports that already exist keep their
+current scores.
+
+Supported uploaded files are Microsoft Word (`.doc`, `.docx`), Microsoft
+PowerPoint (`.pptx`), Rich Text Format (`.rtf`), OpenDocument Text (`.odt`),
+plain text (`.txt`), and PDF (`.pdf`), up to 20 MB per file.
+
+For illustrated instructions, see the official
+[administrator's guide](https://plagiarismcheck.org/blog/how-to-set-up-an-integration-in-moodle/)
+and [instructor's guide](https://plagiarismcheck.org/blog/how-to-use-an-integration-in-moodle/).
+
+## Contributing
+
+Development documentation, including how to run the automated tests and the
+static checks, is in [TESTING.md](TESTING.md).
+
+The test suite does not contact PlagiarismCheck.org and does not need an API
+token. GitHub Actions runs it against every supported Moodle release before a
+change is merged.
+
+## Privacy
+
+Submissions enabled for checking are transmitted to PlagiarismCheck.org for
+processing. Before enabling the plugin, administrators should review the
+[PlagiarismCheck.org Privacy Policy](https://plagiarismcheck.org/privacy-policy/)
+and [Terms and Conditions](https://plagiarismcheck.org/terms-of-service/) and
+ensure that their Moodle privacy disclosures and institutional policies are
+appropriate.
+
+## Support
+
+- Product and account support: [support@plagiarismcheck.org](mailto:support@plagiarismcheck.org)
+- Moodle plugin page: [plagiarism_pchkorg](https://marketplace.moodle.com/plugins/plagiarism_pchkorg)
+- Service website: [plagiarismcheck.org](https://plagiarismcheck.org/)
+
+## License
+
+This plugin is licensed under the [GNU General Public License v3 or
+later](LICENSE).

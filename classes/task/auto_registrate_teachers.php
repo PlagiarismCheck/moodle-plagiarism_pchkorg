@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Scheduled task which registers teachers with the service.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -29,7 +31,6 @@ defined('MOODLE_INTERNAL') || die();
  * Teacher auto registration.
  */
 class auto_registrate_teachers extends \core\task\scheduled_task {
-
     /**
      * Name of the task.
      *
@@ -43,13 +44,18 @@ class auto_registrate_teachers extends \core\task\scheduled_task {
     /**
      * Task execution.
      *
+     * Left to propagate rather than caught: when the service could not
+     * confirm the auto-registration setting, cron_auto_registrate_teachers()
+     * throws so Moodle records this run as failed instead of successful.
+     *
      * @throws \coding_exception
      * @throws \dml_exception
+     * @throws \moodle_exception
      */
     public function execute() {
         global $CFG;
 
-        require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
+        require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
 
         $plugin = new \plagiarism_plugin_pchkorg();
         $plugin->cron_auto_registrate_teachers();

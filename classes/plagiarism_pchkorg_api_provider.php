@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Client for the PlagiarismCheck.org HTTP API.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -23,11 +25,14 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/state.php');
+require_once(__DIR__ . '/transport.php');
+require_once(__DIR__ . '/curl_transport.php');
+
 /**
  * Class provider HTTP-API methods.
  */
 class plagiarism_pchkorg_api_provider {
-
     /**
      * Auth token.
      *
@@ -68,14 +73,30 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
+     * HTTP transport.
+     *
+     * @var plagiarism_pchkorg_transport
+     */
+    private $transport;
+
+    /**
      * Constructor for api provider.
      *
      * @param $token
      * @param string $endpoint
+     * @param plagiarism_pchkorg_transport|null $transport Defaults to Moodle curl.
      */
-    public function __construct($token, $endpoint = 'https://plagiarismcheck.org') {
+    public function __construct(
+        $token,
+        $endpoint = 'https://plagiarismcheck.org',
+        $transport = null
+    ) {
         $this->token = $token;
         $this->endpoint = $endpoint;
+        if (null === $transport) {
+            $transport = new plagiarism_pchkorg_curl_transport();
+        }
+        $this->transport = $transport;
     }
 
     /**
@@ -90,8 +111,10 @@ class plagiarism_pchkorg_api_provider {
      * @param $content
      * @param $mime
      * @param $filename
+     * @param array $filters
+     * @param string|null $email Email of the acting user, for group token auth.
      *
-     * @return |null
+     * @return int|null
      */
     public function general_send_check(
         $authorhash,
@@ -103,7 +126,8 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = array()
+        $filters = [],
+        $email = null
     ) {
         if ($this->is_group_token()) {
             return $this->send_group_text(
@@ -116,7 +140,8 @@ class plagiarism_pchkorg_api_provider {
                 $content,
                 $mime,
                 $filename,
-                $filters
+                $filters,
+                $email
             );
         } else {
             return $this->send_text(
@@ -128,7 +153,8 @@ class plagiarism_pchkorg_api_provider {
                 $content,
                 $mime,
                 $filename,
-                $filters
+                $filters,
+                $email
             );
         }
     }
@@ -145,8 +171,10 @@ class plagiarism_pchkorg_api_provider {
      * @param $content
      * @param $mime
      * @param $filename
+     * @param array $filters
+     * @param string|null $email Email of the acting user, for group token auth.
      *
-     * @return |null
+     * @return int|null
      */
     public function send_group_text(
         $authorhash,
@@ -158,35 +186,35 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = array()
+        $filters = [],
+        $email = null
     ) {
 
         $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
-        $curl = new curl();
-        $response = $curl->post(
-                $this->endpoint . '/lms/moodle/check-text/',
-                $this->get_body_for_group(
-                        $boundary,
-                        $authorhash,
-                        $cousereid,
-                        $assignmentid,
-                        $assignmentname,
-                        $submissionid,
-                        $attachmentid,
-                        $content,
-                        $mime,
-                        $filename,
-                        $filters
-                ),
-                array(
+        $response = $this->transport->post(
+            $this->endpoint . '/lms/moodle/check-text/',
+            $this->get_body_for_group(
+                $boundary,
+                $authorhash,
+                $cousereid,
+                $assignmentid,
+                $assignmentname,
+                $submissionid,
+                $attachmentid,
+                $content,
+                $mime,
+                $filename,
+                $filters
+            ),
+            [
                         'CURLOPT_RETURNTRANSFER' => true,
                         'CURLOPT_TIMEOUT' => 50,
-                        'CURLOPT_HTTPHEADER' => array(
-                                'X-API-TOKEN: ' . $this->generate_api_token(),
-                                'Content-Type: multipart/form-data; boundary=' . $boundary
-                        ),
-                )
+                        'CURLOPT_HTTPHEADER' => [
+                                'X-API-TOKEN: ' . $this->generate_api_token($email),
+                                'Content-Type: multipart/form-data; boundary=' . $boundary,
+                        ],
+                ]
         );
         $this->set_last_error(null);
         $id = null;
@@ -229,7 +257,7 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = array()
+        $filters = []
     ) {
         $eol = "\r\n";
 
@@ -269,8 +297,10 @@ class plagiarism_pchkorg_api_provider {
      * @param $content
      * @param $mime
      * @param $filename
+     * @param array $filters
+     * @param string|null $email Email of the acting user, for group token auth.
      *
-     * @return |null
+     * @return int|null
      */
     public function send_text(
         $cousereid,
@@ -281,34 +311,35 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = array()) {
+        $filters = [],
+        $email = null
+    ) {
 
         $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
-        $curl = new curl();
-        $response = $curl->post(
-                $this->endpoint . '/api/v1/text',
-                $this->get_body(
-                    $boundary,
-                    $cousereid,
-                    $assignmentid,
-                    $assignmentname,
-                    $submissionid,
-                    $attachmentid,
-                    $content,
-                    $mime,
-                    $filename,
-                    $filters
-                ),
-                array(
+        $response = $this->transport->post(
+            $this->endpoint . '/api/v1/text',
+            $this->get_body(
+                $boundary,
+                $cousereid,
+                $assignmentid,
+                $assignmentname,
+                $submissionid,
+                $attachmentid,
+                $content,
+                $mime,
+                $filename,
+                $filters
+            ),
+            [
                         'CURLOPT_RETURNTRANSFER' => true,
                         'CURLOPT_TIMEOUT' => 50,
                         'CURLOPT_POST' => true,
-                        'CURLOPT_HTTPHEADER' => array(
-                                'X-API-TOKEN: ' . $this->generate_api_token(),
-                                'Content-Type: multipart/form-data; boundary=' . $boundary
-                        ),
-                )
+                        'CURLOPT_HTTPHEADER' => [
+                                'X-API-TOKEN: ' . $this->generate_api_token($email),
+                                'Content-Type: multipart/form-data; boundary=' . $boundary,
+                        ],
+                ]
         );
         $this->set_last_error(null);
         $id = null;
@@ -339,17 +370,16 @@ class plagiarism_pchkorg_api_provider {
             $token = $this->token . '::' . hash('sha256', $this->token . $email);
         }
 
-        $curl = new curl();
-        $curl->post(
-                $this->endpoint . '/api/v1/agreement/create/moodle-plugin/2019-04-11/',
-                '',
-                array(
+        $this->transport->post(
+            $this->endpoint . '/api/v1/agreement/create/moodle-plugin/2019-04-11/',
+            '',
+            [
                         'CURLOPT_RETURNTRANSFER' => true,
                         'CURLOPT_POST' => true,
-                        'CURLOPT_HTTPHEADER' => array(
+                        'CURLOPT_HTTPHEADER' => [
                                 'X-API-TOKEN: ' . $token,
-                        ),
-                )
+                        ],
+                ]
         );
     }
 
@@ -417,7 +447,7 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = array()
+        $filters = []
     ) {
         $eol = "\r\n";
 
@@ -466,84 +496,104 @@ class plagiarism_pchkorg_api_provider {
     /**
      * Check that user belongs to group when it is group account.
      *
+     * Membership is unknown while the service is unreachable, and this
+     * boolean signature has no way to say so. Callers that need to tell
+     * "confirmed non-member" apart from "could not ask" must use
+     * {@see get_group_member_response()} and check is_known instead.
+     *
      * @param string $email
      * @return bool
      */
     public function is_group_member($email = '') {
-        if (!$this->is_group_token()) {
-            return true;
-        }
-
-        static $resultmap = array();
-
-        if (!array_key_exists($email, $resultmap)) {
-            $resultmap[$email] = false;
-            $curl = new curl();
-            $response = $curl->post($this->endpoint . '/lms/moodle/is-group-member/', array(
-                    'token' => $this->token,
-                    'hash' => $this->user_email_to_hash($email)
-            ), array(
-                    'CURLOPT_RETURNTRANSFER' => true,
-                // The maximum number of seconds to allow cURL functions to execute.
-                    'CURLOPT_TIMEOUT' => 8
-            ));
-
-            if ($json = json_decode($response)) {
-                if (true == $json->is_member) {
-                    $resultmap[$email] = true;
-                }
-            }
-        }
-
-        return $resultmap[$email];
+        return $this->get_group_member_response($email)->is_member;
     }
 
     /**
      * Check that user belongs to group when it is group account.
-     * And Receive auto_registration_option.
+     * And receive the auto_registration option.
      *
      * @param string $email
-     * @return object
+     * @return object is_member, is_auto_registration_enabled, and is_known.
+     *                 is_known is false when the service could not be reached
+     *                 or answered with something that could not be parsed; in
+     *                 that case is_member and is_auto_registration_enabled are
+     *                 placeholders and must not be trusted or persisted.
      */
     public function get_group_member_response($email = '') {
         if (!$this->is_group_token()) {
-            $result = new \stdClass;
+            $result = new \stdClass();
             $result->is_member = true;
             $result->is_auto_registration_enabled = false;
+            $result->is_known = true;
 
             return $result;
         }
 
-        static $resultmap = array();
+        static $resultmap = [];
 
-        if (!array_key_exists($email, $resultmap)) {
-            //default result. For case when we can not receive response.
-            $result = new \stdClass;
-            $result->is_member = false;
-            $result->is_auto_registration_enabled = false;
-            $resultmap[$email] = $result;
-
-            $curl = new curl();
-            $response = $curl->post($this->endpoint . '/lms/moodle/is-group-member/', array(
-                    'token' => $this->token,
-                    'hash' => $this->user_email_to_hash($email)
-            ), array(
-                    'CURLOPT_RETURNTRANSFER' => true,
-                // The maximum number of seconds to allow cURL functions to execute.
-                    'CURLOPT_TIMEOUT' => 8
-            ));
-
-            if ($json = json_decode($response)) {
-                $result->is_member = $json->is_member;
-                $result->is_auto_registration_enabled = $json->is_auto_registration_enabled;
-                $resultmap[$email] = $result;
-            }
+        if (array_key_exists($email, $resultmap)) {
+            return $resultmap[$email];
         }
 
-        return $resultmap[$email];
+        $response = $this->transport->post($this->endpoint . '/lms/moodle/is-group-member/', [
+                'token' => $this->token,
+                'hash' => $this->user_email_to_hash($email),
+        ], [
+                'CURLOPT_RETURNTRANSFER' => true,
+            // The maximum number of seconds to allow cURL functions to execute.
+                'CURLOPT_TIMEOUT' => 8,
+        ]);
+
+        $result = $this->decode_group_member_response($response);
+        if (null === $result) {
+            // Unreachable or unparseable. Deliberately not cached: a later
+            // call in the same request gets a fresh chance to reach the
+            // service, rather than being stuck with this answer.
+            $result = new \stdClass();
+            $result->is_member = false;
+            $result->is_auto_registration_enabled = false;
+            $result->is_known = false;
+
+            return $result;
+        }
+
+        $resultmap[$email] = $result;
+
+        return $result;
     }
 
-   /**
+    /**
+     * Decode an is-group-member response body.
+     *
+     * @param string|bool $response
+     * @return object|null is_member and is_auto_registration_enabled, or
+     *                      null when the response cannot be trusted (curl
+     *                      failure, HTTP error body, truncated or unrelated
+     *                      JSON, or a response missing either key).
+     */
+    private function decode_group_member_response($response) {
+        if (false === $response || null === $response || '' === $response) {
+            return null;
+        }
+
+        $json = json_decode($response);
+        if (
+            !is_object($json)
+            || !property_exists($json, 'is_member')
+            || !property_exists($json, 'is_auto_registration_enabled')
+        ) {
+            return null;
+        }
+
+        $result = new \stdClass();
+        $result->is_member = (bool) $json->is_member;
+        $result->is_auto_registration_enabled = (bool) $json->is_auto_registration_enabled;
+        $result->is_known = true;
+
+        return $result;
+    }
+
+    /**
      * Auto registration is enabled for this university,
      *  so we registrate a user and user can check submissions.
      *
@@ -554,18 +604,16 @@ class plagiarism_pchkorg_api_provider {
      * @return bool
      */
     public function auto_registrate_member($name, $email, $role) {
-        $curl = new curl();
-        $response = $curl->post($this->endpoint . '/lms/moodle/auto-registration/', array(
+        $response = $this->transport->post($this->endpoint . '/lms/moodle/auto-registration/', [
                 'token' => $this->token,
                 'name' => $name,
                 'email' => $email,
                 'role' => $role,
-        ), array(
+        ], [
                 'CURLOPT_RETURNTRANSFER' => true,
             // The maximum number of seconds to allow cURL functions to execute.
-                'CURLOPT_TIMEOUT' => 30
-        ));
-
+                'CURLOPT_TIMEOUT' => 30,
+        ]);
 
         if ($json = json_decode($response)) {
             return $json->success;
@@ -588,35 +636,34 @@ class plagiarism_pchkorg_api_provider {
             return $this->group_check_text($textid);
         }
 
-        $curl = new curl();
-        $response = $curl->get($this->endpoint . '/api/v1/text/' . $textid, array(), array(
+        $response = $this->transport->get($this->endpoint . '/api/v1/text/' . $textid, [], [
                 'CURLOPT_RETURNTRANSFER' => true,
                 'CURLOPT_TIMEOUT' => 30,
                 'CURLOPT_POST' => false,
-                'CURLOPT_HTTPHEADER' => array(
+                'CURLOPT_HTTPHEADER' => [
                         'X-API-TOKEN: ' . $this->generate_api_token(),
-                        'Content-Type: application/x-www-form-urlencoded'
-                ),
-        ));
+                        'Content-Type: application/x-www-form-urlencoded',
+                ],
+        ]);
 
-        /*
-             const STATE_CREATED = 1;
-             const STATE_STORED = 2;
-             const STATE_SUBMITTED = 3;
-             const STATE_FAILED = 4;
-             const STATE_CHECKED = 5;
-             const STATE_TEMP_FAILED = 6;
-             const STATE_DROPPED = 7;
-             const STATE_ERASED = 8;
-        */
         if ($json = json_decode($response)) {
-            if (isset($json->data) && \in_array($json->data->state, array(4,5,6,7,8), true)) {
-                $result = new stdClass;
-                $result->id = $json->data->report->id;
+            if (
+                isset($json->data)
+                    && \in_array($json->data->state, plagiarism_pchkorg_state::remote_final_states(), true)
+            ) {
+                // The service returns a null report for texts which were never checked
+                // (failed, dropped, erased), and a null ai_report whenever AI detection
+                // did not run. Neither may be dereferenced unguarded.
+                $result = new stdClass();
+                $result->id = isset($json->data->report->id) ? $json->data->report->id : null;
                 $result->state = $json->data->state;
-                if (5 === $json->data->state) {
-                    $result->percent = $json->data->report->percent;
-                    $result->percent_ai = $json->data->ai_report->processed_percent;
+                if (plagiarism_pchkorg_state::REMOTE_CHECKED === $json->data->state) {
+                    $result->percent = isset($json->data->report->percent)
+                        ? $json->data->report->percent
+                        : null;
+                    $result->percent_ai = isset($json->data->ai_report->processed_percent)
+                        ? $json->data->ai_report->processed_percent
+                        : null;
                 } else {
                     $result->percent = null;
                     $result->percent_ai = null;
@@ -637,25 +684,34 @@ class plagiarism_pchkorg_api_provider {
      * @return object|null
      */
     public function group_check_text($textid) {
-        $curl = new curl();
-        $response = $curl->get("{$this->endpoint}/lms/check-report/{$textid}/", array(
-                'token' => $this->token
-        ), array(
+        $response = $this->transport->get("{$this->endpoint}/lms/check-report/{$textid}/", [
+                'token' => $this->token,
+        ], [
                 'CURLOPT_RETURNTRANSFER' => true,
                 'CURLOPT_TIMEOUT' => 30,
                 'CURLOPT_POST' => false,
-                'CURLOPT_HTTPHEADER' => array(
-                        'Content-Type: application/x-www-form-urlencoded'
-                ),
-        ));
+                'CURLOPT_HTTPHEADER' => [
+                        'Content-Type: application/x-www-form-urlencoded',
+                ],
+        ]);
         if ($json = json_decode($response)) {
-            if (isset($json->data) && \in_array($json->data->state, array(4,5,6,7,8), true)) {
-                $result = new stdClass;
-                $result->id = $json->data->report->id;
+            if (
+                isset($json->data)
+                    && \in_array($json->data->state, plagiarism_pchkorg_state::remote_final_states(), true)
+            ) {
+                // The service returns a null report for texts which were never checked
+                // (failed, dropped, erased), and a null ai_report whenever AI detection
+                // did not run. Neither may be dereferenced unguarded.
+                $result = new stdClass();
+                $result->id = isset($json->data->report->id) ? $json->data->report->id : null;
                 $result->state = $json->data->state;
-                if (5 === $json->data->state) {
-                    $result->percent = $json->data->report->percent;
-                    $result->percent_ai = $json->data->ai_report->processed_percent;
+                if (plagiarism_pchkorg_state::REMOTE_CHECKED === $json->data->state) {
+                    $result->percent = isset($json->data->report->percent)
+                        ? $json->data->report->percent
+                        : null;
+                    $result->percent_ai = isset($json->data->ai_report->processed_percent)
+                        ? $json->data->ai_report->processed_percent
+                        : null;
                 } else {
                     $result->percent = null;
                     $result->percent_ai = null;
@@ -681,16 +737,26 @@ class plagiarism_pchkorg_api_provider {
     /**
      * Generate token for API auth.
      *
+     * For a group token the credential is bound to the acting user's email. Callers which
+     * do not run in the context of that user (scheduled tasks, where $USER is the cron
+     * user rather than the submitting student) must pass the email explicitly.
+     *
+     * @param string|null $email Email of the acting user. Defaults to the logged in user.
      * @return string
      */
-    public function generate_api_token() {
+    public function generate_api_token($email = null) {
         global $USER;
 
-        if ($this->is_group_token()) {
-            return $this->token . '::' . hash('sha256', $this->token . strtolower($USER->email));
+        if (!$this->is_group_token()) {
+            // A personal token is the credential on its own; no user is involved.
+            return $this->token;
         }
 
-        return $this->token;
+        if (null === $email) {
+            $email = isset($USER->email) ? $USER->email : '';
+        }
+
+        return $this->token . '::' . hash('sha256', $this->token . strtolower($email));
     }
 
     /**
@@ -700,15 +766,15 @@ class plagiarism_pchkorg_api_provider {
      * @return bool
      */
     public function is_supported_mime($mime) {
-        return in_array($mime, array(
+        return in_array($mime, [
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'application/rtf',
             'application/vnd.oasis.opendocument.text',
             'text/plain',
-            'application/pdf'
-        ), true);
+            'application/pdf',
+        ], true);
     }
 
     /**
@@ -718,5 +784,232 @@ class plagiarism_pchkorg_api_provider {
      */
     public function get_max_filesize() {
         return 20 * 1048576;
+    }
+
+    /**
+     * Check the configured token against the service.
+     *
+     * Called only when plugin settings are saved. The three outcomes are kept
+     * apart on purpose: an unreachable service must not be reported to the
+     * administrator as an invalid token.
+     *
+     * @return object With ok (bool), reachable (bool) and group (object|null).
+     */
+    public function validate_token() {
+        $result = new \stdClass();
+        $result->ok = false;
+        $result->reachable = true;
+        $result->group = null;
+
+        $response = $this->transport->post($this->endpoint . '/lms/moodle/token/validate/', [
+            'token' => $this->token,
+        ], [
+            'CURLOPT_RETURNTRANSFER' => true,
+            'CURLOPT_TIMEOUT' => 10,
+        ]);
+
+        if (false === $response || null === $response || '' === $response) {
+            $result->reachable = false;
+
+            return $result;
+        }
+
+        $json = json_decode($response);
+        if (!is_object($json)) {
+            $result->reachable = false;
+
+            return $result;
+        }
+
+        if (isset($json->success) && $json->success) {
+            $result->ok = true;
+            if (isset($json->data->group)) {
+                $result->group = $json->data->group;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Active ignore templates of an assignment.
+     *
+     * @param string $assignmentkey
+     * @param string $email Email of the acting user.
+     * @return array|null Array of template objects, or null when the call failed.
+     */
+    public function ignore_template_list($assignmentkey, $email) {
+        $json = $this->ignore_template_request('', [
+            'token' => $this->token,
+            'hash' => $this->user_email_to_hash($email),
+            'assignment_key' => $assignmentkey,
+        ]);
+
+        if (null === $json || !isset($json->data->templates)) {
+            return null;
+        }
+
+        return $json->data->templates;
+    }
+
+    /**
+     * Delete one ignore template.
+     *
+     * @param string $assignmentkey
+     * @param int $templateid
+     * @param string $email
+     * @return bool
+     */
+    public function ignore_template_delete($assignmentkey, $templateid, $email) {
+        $json = $this->ignore_template_request('delete/', [
+            'token' => $this->token,
+            'hash' => $this->user_email_to_hash($email),
+            'assignment_key' => $assignmentkey,
+            'template_id' => (int) $templateid,
+        ]);
+
+        return null !== $json;
+    }
+
+    /**
+     * Original bytes of one ignore template, for the download proxy.
+     *
+     * @param string $assignmentkey
+     * @param int $templateid
+     * @param string $email
+     * @return string|null
+     */
+    public function ignore_template_download($assignmentkey, $templateid, $email) {
+        $response = $this->transport->post(
+            $this->endpoint . '/lms/moodle/assignment/ignore-templates/download/',
+            [
+                'token' => $this->token,
+                'hash' => $this->user_email_to_hash($email),
+                'assignment_key' => $assignmentkey,
+                'template_id' => (int) $templateid,
+            ],
+            [
+                'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_TIMEOUT' => 60,
+            ]
+        );
+
+        if (false === $response || null === $response || '' === $response) {
+            $this->set_last_error('unreachable');
+
+            return null;
+        }
+
+        // Errors are JSON; a template is the original file, which may be
+        // anything. Only treat it as an error when it parses and says so.
+        $json = json_decode($response);
+        if (is_object($json) && isset($json->success) && !$json->success) {
+            $this->set_last_error(isset($json->code) ? $json->code : 'template_not_found');
+
+            return null;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Apply deletions, uploads and pasted text in one save.
+     *
+     * @param string $assignmentkey
+     * @param array $files Each an array with filename, mime and content keys.
+     * @param string $text Pasted template text, or empty.
+     * @param array $deleteids Template ids to remove.
+     * @param string $email
+     * @return bool True on success; on failure see get_last_error().
+     */
+    public function ignore_template_save($assignmentkey, array $files, $text, array $deleteids, $email) {
+        $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
+        $eol = "\r\n";
+
+        $body = '';
+        $body .= $this->get_part('token', $this->token, $boundary);
+        $body .= $this->get_part('hash', $this->user_email_to_hash($email), $boundary);
+        $body .= $this->get_part('assignment_key', $assignmentkey, $boundary);
+        if ('' !== trim((string) $text)) {
+            $body .= $this->get_part('template_text', $text, $boundary);
+        }
+        foreach (array_values($deleteids) as $index => $deleteid) {
+            $body .= $this->get_part(sprintf('delete[%d]', $index), (int) $deleteid, $boundary);
+        }
+        foreach (array_values($files) as $index => $file) {
+            $body .= $this->get_file_part(
+                sprintf('templates[%d]', $index),
+                $file['content'],
+                $file['mime'],
+                $file['filename'],
+                $boundary
+            );
+        }
+        $body .= '--' . $boundary . '--' . $eol;
+
+        $response = $this->transport->post(
+            $this->endpoint . '/lms/moodle/assignment/ignore-templates/save/',
+            $body,
+            [
+                'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_TIMEOUT' => 120,
+                'CURLOPT_HTTPHEADER' => [
+                    'Content-Type: multipart/form-data; boundary=' . $boundary,
+                ],
+            ]
+        );
+
+        return null !== $this->decode_ignore_template_response($response);
+    }
+
+    /**
+     * POST to an ignore-template endpoint with simple form fields.
+     *
+     * @param string $path Appended to the ignore-templates base path.
+     * @param array $fields
+     * @return object|null Decoded response, or null on failure.
+     */
+    private function ignore_template_request($path, array $fields) {
+        $response = $this->transport->post(
+            $this->endpoint . '/lms/moodle/assignment/ignore-templates/' . $path,
+            $fields,
+            [
+                'CURLOPT_RETURNTRANSFER' => true,
+                'CURLOPT_TIMEOUT' => 15,
+            ]
+        );
+
+        return $this->decode_ignore_template_response($response);
+    }
+
+    /**
+     * Decode a response, recording the service's error code when it failed.
+     *
+     * @param string|bool $response
+     * @return object|null
+     */
+    private function decode_ignore_template_response($response) {
+        if (false === $response || null === $response || '' === $response) {
+            $this->set_last_error('unreachable');
+
+            return null;
+        }
+
+        $json = json_decode($response);
+        if (!is_object($json)) {
+            $this->set_last_error('unreachable');
+
+            return null;
+        }
+
+        if (!isset($json->success) || !$json->success) {
+            $this->set_last_error(isset($json->code) ? $json->code : 'template_processing_failed');
+
+            return null;
+        }
+
+        $this->set_last_error(null);
+
+        return $json;
     }
 }

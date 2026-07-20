@@ -15,44 +15,42 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled task which uploads queued submissions.
+ * Test double for a stored file.
  *
  * @package   plagiarism_pchkorg
- * @category  plagiarism
+ * @category  test
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace plagiarism_pchkorg\task;
-
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Send queued submissions.
+ * The part of a stored file the privacy export looks at.
+ *
+ * Written by hand rather than mocked: the supported Moodle range spans PHPUnit
+ * 7 to 11, whose mocking APIs are not compatible, and only one method is
+ * needed.
  */
-class send_submissions extends \core\task\scheduled_task {
+class plagiarism_pchkorg_fake_stored_file {
+    /** @var int Identity of the file. */
+    private $id;
+
     /**
-     * Name of the task.
+     * Construct.
      *
-     * @return string
-     * @throws \coding_exception
+     * @param int $id
      */
-    public function get_name() {
-        return get_string('sendqueuedsubmissions', 'plagiarism_pchkorg');
+    public function __construct($id) {
+        $this->id = $id;
     }
 
     /**
-     * Task execution.
+     * Identity of the file.
      *
-     * @throws \coding_exception
-     * @throws \dml_exception
+     * @return int
      */
-    public function execute() {
-        global $CFG;
-
-        require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
-
-        $plugin = new \plagiarism_plugin_pchkorg();
-        $plugin->cron_send_submissions();
+    public function get_id() {
+        return $this->id;
     }
 }

@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Database upgrade steps.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -23,14 +25,21 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+
+ * Apply database upgrades for this plugin.
+
+ */
+
+/**
+ * Xmldb plagiarism pchkorg upgrade.
+ */
 function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
     global $DB;
 
     $dbman = $DB->get_manager();
 
-
     if ($oldversion < 2021072801) {
-
         $table = new xmldb_table('plagiarism_pchkorg_files');
 
         $field1 = new xmldb_field('signature', XMLDB_TYPE_CHAR, '40', null, null, null, null, null);

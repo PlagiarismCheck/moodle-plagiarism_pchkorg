@@ -1,0 +1,119 @@
+/* Ignored assignment templates section of the activity settings form. */
+
+.pchkorg-tpl-intro {
+    max-width: 42em;
+}
+
+.pchkorg-tpl-lead {
+    margin-bottom: 0.5rem;
+}
+
+.pchkorg-tpl-counter {
+    margin-bottom: 0.25rem;
+}
+
+.pchkorg-tpl-badge {
+    display: inline-block;
+    padding: 0.15em 0.6em;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 10rem;
+    font-size: 0.85em;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.pchkorg-tpl-hint,
+.pchkorg-tpl-empty {
+    font-size: 0.9em;
+    opacity: 0.75;
+}
+
+.pchkorg-tpl-note {
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+/* One attached template: icon, name, size, download. */
+.pchkorg-tpl-row {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+}
+
+.pchkorg-tpl-row .pchkorg-tpl-icon {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin-right: 0.4rem;
+}
+
+.pchkorg-tpl-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pchkorg-tpl-size {
+    flex: 0 0 auto;
+    margin-left: 0.5rem;
+    font-size: 0.85em;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.pchkorg-tpl-download {
+    flex: 0 0 auto;
+    margin-left: 0.5rem;
+    opacity: 0.6;
+}
+
+.pchkorg-tpl-download:hover,
+.pchkorg-tpl-download:focus {
+    opacity: 1;
+}
+
+.pchkorg-tpl-check {
+    margin-right: 0.4rem;
+}
+
+/* Accepted file types, grouped by kind of document. */
+.pchkorg-tpl-types {
+    margin-top: 0.5rem;
+}
+
+.pchkorg-tpl-types-title {
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.pchkorg-tpl-types-table {
+    margin: 0;
+    border-collapse: collapse;
+}
+
+.pchkorg-tpl-types-table th,
+.pchkorg-tpl-types-table td {
+    padding: 0.15rem 0 0.15rem 0;
+    border: 0;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.pchkorg-tpl-types-table .pchkorg-tpl-kind {
+    padding-right: 1.5rem;
+    white-space: nowrap;
+}
+
+.pchkorg-tpl-types-table .pchkorg-tpl-exts {
+    font-size: 0.95em;
+    opacity: 0.85;
+}
+
+/* Neutralise the theme's inline-code colouring; keep the monospace. */
+.pchkorg-tpl-types-table code.pchkorg-tpl-ext {
+    padding: 0;
+    background: none;
+    color: inherit;
+    font-size: 0.95em;
+    white-space: nowrap;
+}

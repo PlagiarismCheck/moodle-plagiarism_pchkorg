@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Event observer registration.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -23,29 +25,29 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$observers = array (
-    array(
+$observers = [
+    [
         'eventname' => '\assignsubmission_file\event\assessable_uploaded',
-        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_file_uploaded'
-    ),
-    array(
+        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_file_uploaded',
+    ],
+    [
         'eventname' => '\assignsubmission_onlinetext\event\assessable_uploaded',
-        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_onlinetext_uploaded'
-    ),
-    array(
+        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_onlinetext_uploaded',
+    ],
+    [
         'eventname' => '\mod_assign\event\assessable_submitted',
-        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_submitted'
-    ),
-    array(
+        'callback'  => 'plagiarism_pchkorg_observer::assignsubmission_submitted',
+    ],
+    [
         'eventname' => '\core\event\course_module_deleted',
-        'callback'  => 'plagiarism_pchkorg_observer::course_module_deleted'
-    ),
-    array(
+        'callback'  => 'plagiarism_pchkorg_observer::course_module_deleted',
+    ],
+    [
         'eventname' => '\mod_quiz\event\attempt_submitted',
         'callback'  => 'plagiarism_pchkorg_observer::quiz_submitted',
-    ),
-    array(
+    ],
+    [
         'eventname' => '\mod_forum\event\assessable_uploaded',
         'callback'  => 'plagiarism_pchkorg_observer::forum_assessable_uploaded',
-    ),
-);
+    ],
+];

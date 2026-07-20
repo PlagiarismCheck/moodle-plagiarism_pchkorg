@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Dispatches Moodle events into the submission pipeline.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -25,7 +27,7 @@ if (!defined('MOODLE_INTERNAL')) {
     die('Direct access to this script is forbidden.'); // It must be included from a Moodle page.
 }
 
-require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
+require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
 
 /**
  * This class subscribe to events.
@@ -36,12 +38,13 @@ class plagiarism_pchkorg_observer {
      * @param \core\event\course_module_deleted $event
      */
     public static function course_module_deleted(
-        \core\event\course_module_deleted $event) {
+        \core\event\course_module_deleted $event
+    ) {
         global $DB;
         $eventdata = $event->get_data();
 
-        $DB->delete_records('plagiarism_pchkorg_files', array('cm' => $eventdata['contextinstanceid']));
-        $DB->delete_records('plagiarism_pchkorg_config', array('cm' => $eventdata['contextinstanceid']));
+        $DB->delete_records('plagiarism_pchkorg_files', ['cm' => $eventdata['contextinstanceid']]);
+        $DB->delete_records('plagiarism_pchkorg_config', ['cm' => $eventdata['contextinstanceid']]);
     }
 
     /**
@@ -49,7 +52,8 @@ class plagiarism_pchkorg_observer {
      * @param \assignsubmission_file\event\assessable_uploaded $event
      */
     public static function assignsubmission_file_uploaded(
-        \assignsubmission_file\event\assessable_uploaded $event) {
+        \assignsubmission_file\event\assessable_uploaded $event
+    ) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'file_uploaded';
         $eventdata['other']['modulename'] = 'assign';
@@ -63,7 +67,8 @@ class plagiarism_pchkorg_observer {
      * @param \assignsubmission_onlinetext\event\assessable_uploaded $event
      */
     public static function assignsubmission_onlinetext_uploaded(
-        \assignsubmission_onlinetext\event\assessable_uploaded $event) {
+        \assignsubmission_onlinetext\event\assessable_uploaded $event
+    ) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'content_uploaded';
         $eventdata['other']['modulename'] = 'assign';
@@ -77,7 +82,8 @@ class plagiarism_pchkorg_observer {
      * @param \mod_assign\event\assessable_submitted $event
      */
     public static function assignsubmission_submitted(
-        \mod_assign\event\assessable_submitted $event) {
+        \mod_assign\event\assessable_submitted $event
+    ) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'assessable_submitted';
         $eventdata['other']['modulename'] = 'assign';
@@ -91,7 +97,8 @@ class plagiarism_pchkorg_observer {
      * @param \mod_quiz\event\attempt_submitted $event
      */
     public static function quiz_submitted(
-        \mod_quiz\event\attempt_submitted $event) {
+        \mod_quiz\event\attempt_submitted $event
+    ) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'quiz_submitted';
         $eventdata['other']['modulename'] = 'quiz';
@@ -105,7 +112,7 @@ class plagiarism_pchkorg_observer {
      * @param \mod_forum\event\assessable_uploaded $event
      */
     public static function forum_assessable_uploaded(
-        \mod_forum\event\assessable_uploaded$event
+        \mod_forum\event\assessable_uploaded $event
     ) {
         $eventdata = $event->get_data();
         $eventdata['eventtype'] = 'forum_attachment';

@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Scheduled task which polls for finished reports.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -29,7 +31,6 @@ defined('MOODLE_INTERNAL') || die();
  * Update report.
  */
 class update_reports extends \core\task\scheduled_task {
-
     /**
      * Get a name of task
      *
@@ -48,7 +49,7 @@ class update_reports extends \core\task\scheduled_task {
     public function execute() {
         global $CFG;
 
-        require_once($CFG->dirroot.'/plagiarism/pchkorg/lib.php');
+        require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
 
         $plugin = new \plagiarism_plugin_pchkorg();
         $plugin->cron_update_reports();

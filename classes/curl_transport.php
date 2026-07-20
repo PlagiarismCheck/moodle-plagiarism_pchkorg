@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled task which uploads queued submissions.
+ * Default HTTP transport, backed by Moodle curl.
  *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
@@ -23,36 +23,39 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace plagiarism_pchkorg\task;
-
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/transport.php');
+
 /**
- * Send queued submissions.
+ * Default transport: Moodle's curl wrapper.
  */
-class send_submissions extends \core\task\scheduled_task {
+class plagiarism_pchkorg_curl_transport implements plagiarism_pchkorg_transport {
     /**
-     * Name of the task.
+     * Perform an HTTP POST.
      *
-     * @return string
-     * @throws \coding_exception
+     * @param string $url
+     * @param string|array $params
+     * @param array $options
+     * @return string|bool
      */
-    public function get_name() {
-        return get_string('sendqueuedsubmissions', 'plagiarism_pchkorg');
+    public function post($url, $params = '', $options = []) {
+        $curl = new curl();
+
+        return $curl->post($url, $params, $options);
     }
 
     /**
-     * Task execution.
+     * Perform an HTTP GET.
      *
-     * @throws \coding_exception
-     * @throws \dml_exception
+     * @param string $url
+     * @param array $params
+     * @param array $options
+     * @return string|bool
      */
-    public function execute() {
-        global $CFG;
+    public function get($url, $params = [], $options = []) {
+        $curl = new curl();
 
-        require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
-
-        $plugin = new \plagiarism_plugin_pchkorg();
-        $plugin->cron_send_submissions();
+        return $curl->get($url, $params, $options);
     }
 }

@@ -1,0 +1,324 @@
+name: Moodle plugin CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Supported Moodle 3.9-5.2 spans PHP 7.2 (Moodle 3.9 floor) to 8.4 (Moodle 5.x
+  # ceiling), so production code must parse on 7.2 and run cleanly through 8.4.
+  # This job enforces that statically, without needing a Moodle installation.
+  compatibility:
+    name: PHP 7.2-8.4 compatibility
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Install PHPCompatibility
+        run: |
+          mkdir -p "$RUNNER_TEMP/phpcs"
+          cd "$RUNNER_TEMP/phpcs"
+          composer init -n --name=pchkorg/compatibility-check
+          composer config -n allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer require -n \
+            squizlabs/php_codesniffer:^3.9 \
+            phpcompatibility/php-compatibility:^9.3 \
+            dealerdirect/phpcodesniffer-composer-installer:^1.0
+
+      - name: Check compatibility across the supported PHP range
+        run: >
+          "$RUNNER_TEMP/phpcs/vendor/bin/phpcs" -p
+          --standard=PHPCompatibility
+          --runtime-set testVersion 7.2-8.4
+          --extensions=php
+          .
+
+  # Syntax check at the true floor. PHPCompatibility above runs on a modern PHP and
+  # cannot catch everything a 7.2 parser would reject, so lint on 7.2 as well.
+  lint-floor:
+    name: PHP 7.2 syntax (Moodle 3.9 floor)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 7.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.2'
+          coverage: none
+
+      - name: Lint every PHP file
+        run: find . -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+
+  test:
+    name: Moodle ${{ matrix.moodle }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Anchored so the MySQL matrix below runs the exact same Moodle/PHP
+        # combinations rather than a hand-maintained copy that can drift.
+        include: &moodle_php_matrix
+          - moodle: '3.9'
+            moodle-branch: MOODLE_39_STABLE
+            php: '7.4'
+          - moodle: '3.10'
+            moodle-branch: MOODLE_310_STABLE
+            php: '7.4'
+          - moodle: '3.11'
+            moodle-branch: MOODLE_311_STABLE
+            php: '7.4'
+          - moodle: '4.0'
+            moodle-branch: MOODLE_400_STABLE
+            php: '8.0'
+          - moodle: '4.1'
+            moodle-branch: MOODLE_401_STABLE
+            php: '8.1'
+          - moodle: '4.2'
+            moodle-branch: MOODLE_402_STABLE
+            php: '8.1'
+          - moodle: '4.3'
+            moodle-branch: MOODLE_403_STABLE
+            php: '8.2'
+          - moodle: '4.4'
+            moodle-branch: MOODLE_404_STABLE
+            php: '8.3'
+          - moodle: '4.5'
+            moodle-branch: MOODLE_405_STABLE
+            php: '8.3'
+          - moodle: '5.0'
+            moodle-branch: MOODLE_500_STABLE
+            php: '8.3'
+          - moodle: '5.1'
+            moodle-branch: MOODLE_501_STABLE
+            php: '8.4'
+          - moodle: '5.2'
+            moodle-branch: MOODLE_502_STABLE
+            php: '8.4'
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pgsql
+          ini-values: max_input_vars=5000
+          coverage: none
+
+      - name: Install Moodle Plugin CI
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo "$(cd ci/bin && pwd)" >> "$GITHUB_PATH"
+          echo "$(cd ci/vendor/bin && pwd)" >> "$GITHUB_PATH"
+          echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
+          sudo locale-gen en_AU.UTF-8
+
+      - name: Install isolated Moodle test site
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: pgsql
+          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: PHP syntax check
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phplint
+
+      - name: Validate plugin structure
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci validate
+
+      # Style and documentation do not vary with the Moodle version, so they run
+      # once rather than on every entry in the matrix. moodle-plugin-ci's phpcs
+      # command defaults to --standard=moodle regardless of a local phpcs.xml,
+      # so it must be pointed at this plugin's own ruleset explicitly to apply
+      # the documented exceptions for the privacy provider's compatibility shims.
+      - name: Moodle coding style
+        if: ${{ !cancelled() && matrix.moodle == '5.0' }}
+        run: moodle-plugin-ci phpcs --standard=phpcs.xml
+
+      # Advisory for now. Both still report findings that cannot simply be
+      # removed: the privacy provider and the Moodle form hooks must keep
+      # parameters they do not use, because the signatures are fixed by the
+      # interfaces they implement. Promote these to hard gates once the
+      # remaining findings have been triaged.
+      - name: Mess detector (advisory)
+        if: ${{ !cancelled() && matrix.moodle == '5.0' }}
+        continue-on-error: true
+        run: moodle-plugin-ci phpmd
+
+      - name: PHPDoc (advisory)
+        if: ${{ !cancelled() && matrix.moodle == '5.0' }}
+        continue-on-error: true
+        run: moodle-plugin-ci phpdoc
+
+      - name: PHPUnit characterization tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit
+
+      - name: Mark cancelled jobs as failed
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # This plugin is used by real institutions in production, so every supported
+  # Moodle/PHP combination is exercised against real MySQL as well as
+  # PostgreSQL above, not just a sample release: the auto-registration query
+  # used to parse on MySQL while PostgreSQL rejected it outright, and that
+  # class of bug can be version-specific. Static checks (phplint, validate,
+  # phpcs, phpmd, phpdoc) do not depend on the database engine and already run
+  # in the PostgreSQL matrix at every one of these same versions, so only the
+  # DB-dependent PHPUnit run is repeated here.
+  test-mysql-matrix:
+    name: Moodle ${{ matrix.moodle }} / PHP ${{ matrix.php }} / MySQL
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include: *moodle_php_matrix
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli
+          ini-values: max_input_vars=5000
+          coverage: none
+
+      - name: Install Moodle Plugin CI
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo "$(cd ci/bin && pwd)" >> "$GITHUB_PATH"
+          echo "$(cd ci/vendor/bin && pwd)" >> "$GITHUB_PATH"
+          echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
+          sudo locale-gen en_AU.UTF-8
+
+      - name: Install isolated Moodle test site
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: mysqli
+          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: PHPUnit characterization tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit
+
+      - name: Mark cancelled jobs as failed
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # MariaDB is a fork of MySQL, not identical to it, and enough institutions
+  # run it that a dedicated check earns its keep even though real MySQL is
+  # now covered above at every supported version. One job on the newest
+  # supported release keeps that honest without doubling this matrix too.
+  test-mysql:
+    name: Moodle 5.0 / PHP 8.3 / MariaDB
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'true'
+          MYSQL_CHARACTER_SET_SERVER: utf8mb4
+          MYSQL_COLLATION_SERVER: utf8mb4_bin
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli
+          ini-values: max_input_vars=5000
+          coverage: none
+
+      - name: Install Moodle Plugin CI
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo "$(cd ci/bin && pwd)" >> "$GITHUB_PATH"
+          echo "$(cd ci/vendor/bin && pwd)" >> "$GITHUB_PATH"
+          echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
+          sudo locale-gen en_AU.UTF-8
+
+      - name: Install isolated Moodle test site
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: mariadb
+          MOODLE_BRANCH: MOODLE_500_STABLE
+
+      - name: PHPUnit characterization tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit
+
+      - name: Mark cancelled jobs as failed
+        if: ${{ cancelled() }}
+        run: exit 1

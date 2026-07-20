@@ -15,6 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Plugin hooks and the submission pipeline for PlagiarismCheck.org.
+ *
  * @package   plagiarism_pchkorg
  * @category  plagiarism
  * @copyright PlagiarismCheck.org, https://plagiarismcheck.org/
@@ -28,22 +30,38 @@ global $CFG;
 require_once($CFG->dirroot . '/plagiarism/lib.php');
 require_once($CFG->libdir . '/filelib.php');
 require_once($CFG->libdir . '/accesslib.php');
+require_once(__DIR__ . '/classes/state.php');
+require_once(__DIR__ . '/classes/assignment_key.php');
+require_once(__DIR__ . '/classes/ignore_template_form.php');
+require_once(__DIR__ . '/classes/roles.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
+require_once(__DIR__ . '/classes/submission/sender.php');
 require_once(__DIR__ . '/classes/permissions/capability.class.php');
 
 use plagiarism_pchkorg\classes\permissions\capability;
 
-function pchkorg_check_pchkorg_min_percent($value)
-{
+/**
+ * Validate the minimum source similarity percentage.
+ *
+ * @param mixed $value
+ * @return bool
+ */
+function pchkorg_check_pchkorg_min_percent($value) {
     return 0 <= $value && $value < 100;
 }
 
-function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
-{
+/**
+ * Add the plugin's settings to an activity settings form.
+ *
+ * @param object $formwrapper
+ * @param MoodleQuickForm $mform
+ * @return void
+ */
+function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform) {
     $context = context_course::instance($formwrapper->get_course()->id);
     $modulename = $formwrapper->get_current()->modulename;
-    $allowedmodules = array('assign', 'mod_assign');
+    $allowedmodules = ['assign', 'mod_assign'];
     if (!$context || !isset($modulename)) {
         return;
     }
@@ -53,55 +71,73 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
 
     $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
     $enabled = has_capability(capability::ENABLE, $context);
-    if ( '1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_quiz')) {
+    if ('1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_quiz')) {
         $allowedmodules[] = 'quiz';
     }
-    if ( '1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_forum')) {
+    if ('1' === $pchkorgconfigmodel->get_system_config('pchkorg_enable_forum')) {
         $allowedmodules[] = 'forum';
     }
     if ('1' == $config && $enabled) {
         if (!in_array($modulename, $allowedmodules, true)) {
             return;
         }
-        $defaultcmid = null;
-        $cm = optional_param('update', $defaultcmid, PARAM_INT);
-        $minpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
-        $exportedvalues = $mform->exportValues(array());
-        if (!is_array($exportedvalues)) {
-            $exportedvalues = array();
+        // On submit the mod form posts a hidden 'update' of 0 for a new activity,
+        // so an absent id can arrive as either null or 0. Normalise it to null.
+        $cm = optional_param('update', 0, PARAM_INT);
+        if (empty($cm)) {
+            $cm = null;
         }
-        if (!isset($exportedvalues['pchkorg_exclude_self_plagiarism'])
-            || is_null($exportedvalues['pchkorg_exclude_self_plagiarism'])) {
+        $minpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
+        $exportedvalues = $mform->exportValues([]);
+        if (!is_array($exportedvalues)) {
+            $exportedvalues = [];
+        }
+        if (
+            !isset($exportedvalues['pchkorg_exclude_self_plagiarism'])
+            || is_null($exportedvalues['pchkorg_exclude_self_plagiarism'])
+        ) {
             $mform->setDefault('pchkorg_exclude_self_plagiarism', 1);
         }
-        if (!isset($exportedvalues['pchkorg_include_referenced'])
-            || is_null($exportedvalues['pchkorg_include_referenced'])) {
+        if (
+            !isset($exportedvalues['pchkorg_include_referenced'])
+            || is_null($exportedvalues['pchkorg_include_referenced'])
+        ) {
             $mform->setDefault('pchkorg_include_referenced', 0);
         }
-        if (!isset($exportedvalues['pchkorg_include_citation'])
-            || is_null($exportedvalues['pchkorg_include_citation'])) {
+        if (
+            !isset($exportedvalues['pchkorg_include_citation'])
+            || is_null($exportedvalues['pchkorg_include_citation'])
+        ) {
             $mform->setDefault('pchkorg_include_citation', 0);
         }
 
-        if (!isset($exportedvalues['pchkorg_student_can_see_report']) || is_null(
+        if (
+            !isset($exportedvalues['pchkorg_student_can_see_report']) || is_null(
                 $exportedvalues['pchkorg_student_can_see_report']
-            )) {
+            )
+        ) {
             $mform->setDefault('pchkorg_student_can_see_report', 1);
         }
-        if (!isset($exportedvalues['pchkorg_student_can_see_widget']) || is_null(
+        if (
+            !isset($exportedvalues['pchkorg_student_can_see_widget']) || is_null(
                 $exportedvalues['pchkorg_student_can_see_widget']
-            )) {
+            )
+        ) {
             $mform->setDefault('pchkorg_student_can_see_widget', 1);
         }
-        if (!isset($exportedvalues['pchkorg_check_ai']) || is_null(
-            $exportedvalues['pchkorg_check_ai']
-        )) {
+        if (
+            !isset($exportedvalues['pchkorg_check_ai']) || is_null(
+                $exportedvalues['pchkorg_check_ai']
+            )
+        ) {
             $mform->setDefault('pchkorg_check_ai', 1);
         }
 
         if (null === $cm) {
-            if (!isset($exportedvalues['pchkorg_module_use'])
-                || is_null($exportedvalues['pchkorg_module_use'])) {
+            if (
+                !isset($exportedvalues['pchkorg_module_use'])
+                || is_null($exportedvalues['pchkorg_module_use'])
+            ) {
                 $enabledbydefault = $pchkorgconfigmodel->get_system_config('pchkorg_enabled_by_default');
                 if ('1' === $enabledbydefault || null === $enabledbydefault) {
                     $mform->setDefault('pchkorg_module_use', '1');
@@ -111,9 +147,9 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
                 }
             }
         } else {
-            $records = $DB->get_records('plagiarism_pchkorg_config', array(
+            $records = $DB->get_records('plagiarism_pchkorg_config', [
                 'cm' => $cm,
-            ));
+            ]);
             if (!empty($records)) {
                 foreach ($records as $record) {
                     $mform->setDefault($record->name, $record->value);
@@ -129,7 +165,7 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             'select',
             'pchkorg_module_use',
             get_string('pchkorg_module_use', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
         $mform->addHelpButton('pchkorg_module_use', 'pchkorg_module_use', 'plagiarism_pchkorg');
 
@@ -167,48 +203,66 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             'select',
             'pchkorg_exclude_self_plagiarism',
             get_string('pchkorg_exclude_self_plagiarism', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_include_referenced',
             get_string('pchkorg_include_referenced', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_include_citation',
             get_string('pchkorg_include_citation', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_student_can_see_widget',
             get_string('pchkorg_student_can_see_widget', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_student_can_see_report',
             get_string('pchkorg_student_can_see_report', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
 
         $mform->addElement(
             'select',
             'pchkorg_check_ai',
             get_string('pchkorg_check_ai', 'plagiarism_pchkorg'),
-            array(get_string('no'), get_string('yes'))
+            [get_string('no'), get_string('yes')]
         );
+
+        // Ignored templates. Offered for every activity type this plugin
+        // handles, not only assignments: the key identifying the activity to
+        // the service is built from a course module id, which a quiz and a
+        // forum have just as much as an assignment does.
+        //
+        // While an activity is being created there is no module context yet,
+        // so the capability is checked against the course instead.
+        $templatecontext = (null === $cm) ? $context : context_module::instance($cm);
+        if (plagiarism_pchkorg_ignore_template_form::is_available($pchkorgconfigmodel, $templatecontext)) {
+            plagiarism_pchkorg_ignore_template_form::add_elements($mform, $cm, $pchkorgconfigmodel);
+        }
     }
 }
 
-function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
-{
+/**
+ * Persist the plugin's per-activity settings when a form is saved.
+ *
+ * @param object $data Submitted form data.
+ * @param object|null $course
+ * @return object The unmodified form data.
+ */
+function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
     global $DB;
 
     $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
@@ -218,7 +272,7 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
         return $data;
     }
 
-    $fields = array(
+    $fields = [
         'pchkorg_module_use',
         'pchkorg_min_percent',
         'pchkorg_include_citation',
@@ -226,12 +280,12 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
         'pchkorg_exclude_self_plagiarism',
         'pchkorg_student_can_see_widget',
         'pchkorg_student_can_see_report',
-        'pchkorg_check_ai'
-    );
+        'pchkorg_check_ai',
+    ];
 
-    $records = $DB->get_records('plagiarism_pchkorg_config', array(
-        'cm' => $data->coursemodule
-    ));
+    $records = $DB->get_records('plagiarism_pchkorg_config', [
+        'cm' => $data->coursemodule,
+    ]);
 
     $context = context_module::instance($data->coursemodule);
     $canchangeminpercent = has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context);
@@ -245,11 +299,11 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
                     $data->{$record->name} = 0;
                 }
                 if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
-                    $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
+                    $DB->delete_records('plagiarism_pchkorg_config', ['id' => $record->id]);
                     break;
                 }
                 if ($field === 'pchkorg_min_percent' && 0 == $data->{$record->name}) {
-                    $DB->delete_records('plagiarism_pchkorg_config', array('id' => $record->id));
+                    $DB->delete_records('plagiarism_pchkorg_config', ['id' => $record->id]);
                     break;
                 }
                 $record->value = $data->{$record->name};
@@ -273,6 +327,14 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
         }
     }
 
+    // Ignored assignment templates. A failure here must not abort saving the
+    // activity, so it is reported as a notification and the rest of the
+    // settings are kept.
+    $templateerror = plagiarism_pchkorg_ignore_template_form::save($data, $pchkorgconfigmodel);
+    if (null !== $templateerror) {
+        \core\notification::error(plagiarism_pchkorg_ignore_template_form::error_message($templateerror));
+    }
+
     return $data;
 }
 
@@ -280,7 +342,37 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course)
  * Class plagiarism_plugin_pchkorg
  */
 class plagiarism_plugin_pchkorg extends plagiarism_plugin {
+    /**
+     * Maximum length of plagiarism_pchkorg_files.message.
+     *
+     * Must match the column width declared in db/install.xml and db/upgrade.php
+     * (char(130)). Every write to that column goes through truncate_message(),
+     * because on a database in strict mode an over-length value aborts the
+     * insert and the submission is lost -- a shortened message is always the
+     * better outcome.
+     */
+    const MESSAGE_MAX_LENGTH = 130;
 
+    /**
+     * Fit a message into plagiarism_pchkorg_files.message.
+     *
+     * Uses core_text so a multibyte message is never cut mid-character, which
+     * would store invalid UTF-8.
+     *
+     * @param string|null $message message to store
+     * @return string|null message guaranteed to fit the column
+     */
+    public static function truncate_message($message) {
+        if (null === $message || '' === $message) {
+            return $message;
+        }
+
+        if (core_text::strlen($message) <= self::MESSAGE_MAX_LENGTH) {
+            return $message;
+        }
+
+        return core_text::substr($message, 0, self::MESSAGE_MAX_LENGTH);
+    }
 
     /**
      * hook to allow plagiarism specific information to be displayed beside a submission.
@@ -315,7 +407,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 sprintf(
                     '%s (%s)',
                     get_string('pchkorg_debug_mime', 'plagiarism_pchkorg'),
-                    $file->get_mimetype()),
+                    $file->get_mimetype()
+                ),
                 $isdebugenabled
             );
         }
@@ -348,16 +441,9 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 $isdebugenabled
             );
         }
-        $roleDatas = get_user_roles($context, $USER->id, true);
-        $roles = array();
-        foreach ($roleDatas as $rolesData) {
-            $roles[] = strtolower($rolesData->shortname);
-        }
-        // Moodle has multiple roles in courses.
-        $isstudent = in_array('student', $roles)
-            && !in_array('teacher', $roles)
-            && !in_array('editingteacher', $roles)
-            && !in_array('managerteacher', $roles);
+        // Moodle allows several roles at once, so anyone holding a teaching role
+        // is treated as a teacher even when they also hold the student role.
+        $isstudent = plagiarism_pchkorg_roles::is_student($context, $USER->id);
 
         $canview = has_capability(capability::VIEW_SIMILARITY, $context);
 
@@ -395,12 +481,20 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         // Also, there is timeout 8 seconds for response.
         // Even if service will be unavailable, method will try call API only once.
         // Also, we don't use raw user email.
-        if (!$apiprovider->is_group_member($USER->email)) {
+        $ismemberresponse = $apiprovider->get_group_member_response($USER->email);
+        if (!$ismemberresponse->is_member) {
+            // Deny in both cases: a confirmed non-member, and an unknown
+            // answer (service unreachable). Failing open on "unknown" would
+            // let a non-member through during an outage.
             return $this->exit_message(
                 sprintf(
                     '%s (%s)',
-                    get_string('pchkorg_debug_not_member', 'plagiarism_pchkorg'),
-                    $USER->email),
+                    get_string(
+                        $ismemberresponse->is_known ? 'pchkorg_debug_not_member' : 'pchkorg_debug_membership_unknown',
+                        'plagiarism_pchkorg'
+                    ),
+                    $USER->email
+                ),
                 $isdebugenabled
             );
         }
@@ -411,7 +505,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 sprintf(
                     '%s (%s)',
                     get_string('pchkorg_debug_user_has_no_capability', 'plagiarism_pchkorg'),
-                    'mod/assign:view'),
+                    'mod/assign:view'
+                ),
                 $isdebugenabled
             );
         }
@@ -432,14 +527,26 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         } else {
             $where->fileid = $file->get_id();
         }
-        $filerecords = $DB->get_records('plagiarism_pchkorg_files', (array) $where,
-            'id', '*', 0, 1);
+        $filerecords = $DB->get_records(
+            'plagiarism_pchkorg_files',
+            (array) $where,
+            'id',
+            '*',
+            0,
+            1
+        );
 
         if (!$filerecords && $file === null) {
             $where->signature = sha1(trim(strip_tags($linkarray['content'])));
             $where->fileid = null;
-            $filerecords = $DB->get_records('plagiarism_pchkorg_files', (array) $where,
-                'id', '*', 0, 1);
+            $filerecords = $DB->get_records(
+                'plagiarism_pchkorg_files',
+                (array) $where,
+                'id',
+                '*',
+                0,
+                1
+            );
         }
 
         if ($filerecords) {
@@ -448,22 +555,23 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
             $img = new moodle_url('/plagiarism/pchkorg/pix/icon.png');
             $imgsrc = $img->__toString();
 
-            if (array_key_exists('forum', $linkarray)
+            if (
+                array_key_exists('forum', $linkarray)
                 && $isstudent
-                && $filerecord->userid !== $USER->id) {
+                && $filerecord->userid !== $USER->id
+            ) {
                     return $this->exit_message(
                         sprintf(
                             '%s (%s)',
                             get_string('pchkorg_debug_student_not_allowed_see_widget', 'plagiarism_pchkorg'),
-                            $USER->email),
+                            $USER->email
+                        ),
                         $isdebugenabled
                     );
             }
 
             // Text had been successfully checked.
-            if ($filerecord->state == 5) {
-                $action = $apiprovider->get_report_action($filerecord->textid);
-                $reporttoken = $apiprovider->generate_api_token();
+            if ($filerecord->state == plagiarism_pchkorg_state::LOCAL_CHECKED) {
                 $score = $filerecord->score;
                 $isaienabled = '1' === $pchkorgconfigmodel->get_filter_for_module($cmid, 'pchkorg_check_ai');
 
@@ -500,44 +608,32 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
                 } else {
                     $color = '#F04343';
                 }
-                $jsdata = array(
+                // The report link points at this plugin, not at the service. The
+                // service credential is never handed to the browser: report.php
+                // re-checks permission server side and only then posts the token
+                // on to plagiarismcheck.org. Viewers who may see the score but
+                // not open the report get no link at all.
+                $reporturl = null;
+                if ($isreportallowed) {
+                    $reporturl = (new moodle_url(
+                        '/plagiarism/pchkorg/report.php',
+                        ['id' => $filerecord->id, 'sesskey' => sesskey()]
+                    ))->out(false);
+                }
+
+                $jsdata = [
                     'id' => $filerecord->id,
                     'title' => $title,
-                    'action' => $action,
-                    'token' => $reporttoken,
                     'label' => $label,
                     'color' => $color,
-                    'isreportallowed' => $isreportallowed,
-                );
+                    'reporturl' => $reporturl,
+                ];
                 static $isjsfuncinjected = false;
                 if (!$isjsfuncinjected) {
                     $isjsfuncinjected = true;
                     $PAGE->requires->js_amd_inline(
                         "
 window.plagiarism_check_data = [];
-window.plagiarism_check_full_report = function (action, token) {
-    const form = document.createElement('form');
-    const element1 = document.createElement('input');
-    const element2 = document.createElement('input');
-
-    form.method = 'POST';
-    form.target = '_blank';
-    form.action = action;
-
-    element1.value = 'moodle';
-    element1.name = 'lms-type';
-    element1.type = 'hidden';
-    form.appendChild(element1);
-
-    element2.value = token;
-    element2.name = 'token';
-    element2.type = 'hidden';
-    form.appendChild(element2);
-
-    document.body.appendChild(form);
-
-    form.submit();
-};
 
 require(['jquery'], function ($) {
     $(function () {
@@ -553,8 +649,12 @@ require(['jquery'], function ($) {
                             for (var d in window.plagiarism_check_data) {
                                 var data = window.plagiarism_check_data[d];
                                 if (data && data.id == id) {
-                                    var a = document.createElement('a');
-                                    a.setAttribute('href', '#');
+                                    var a = document.createElement(data.reporturl ? 'a' : 'span');
+                                    if (data.reporturl) {
+                                        a.setAttribute('href', data.reporturl);
+                                        a.setAttribute('target', '_blank');
+                                        a.setAttribute('rel', 'noopener');
+                                    }
                                     a.setAttribute('title', data.title);
                                     a.setAttribute('data-id', data.id);
                                     a.style.fontFamily =  'Roboto';
@@ -566,7 +666,7 @@ require(['jquery'], function ($) {
                                     a.style.textDecoration = 'none';
                                     a.style.backgroundColor = data.color;
                                     a.style.color = 'black';
-                                    a.style.cursor = 'pointer';
+                                    a.style.cursor = data.reporturl ? 'pointer' : 'default';
                                     a.style.borderRadius = '4px 4px 4px 4px';
                                     a.style.margin = '4px';
                                     a.style.display = 'inline-block';
@@ -582,32 +682,17 @@ require(['jquery'], function ($) {
                 }
             }
         }
-
-        $(window.document.body).on('click', '.plagiarism-pchkorg-widget', function(e) {
-            var id = $(e.target).closest('a').attr('data-id')
-            if (id) {
-                for (var d in window.plagiarism_check_data) {
-                    var data = window.plagiarism_check_data[d];
-                    if (data && data.id == id && data.isreportallowed) {
-                        window.plagiarism_check_full_report(data.action, data.token);
-                        break;
-                    }
-                }
-            }
-            return false;
-        })
     });
 });
 "
                     );
                 }
 
-                $PAGE->requires->js_amd_inline("window.plagiarism_check_data.push(".json_encode($jsdata).")");
-
+                $PAGE->requires->js_amd_inline("window.plagiarism_check_data.push(" . json_encode($jsdata) . ")");
 
                 return '
-                <span class="plagiarism-pchkorg-widget plagiarism-pchkorg-widget-id-'.$filerecord->id.'"></span>';
-            } else if ($filerecord->state == 10) {
+                <span class="plagiarism-pchkorg-widget plagiarism-pchkorg-widget-id-' . $filerecord->id . '"></span>';
+            } else if ($filerecord->state == plagiarism_pchkorg_state::LOCAL_QUEUED) {
                 $label = get_string('pchkorg_label_queued', 'plagiarism_pchkorg');
                 return '
                 <span style="padding: 5px 3px;
@@ -621,7 +706,7 @@ display: inline-block;"
                 <img src="' . $imgsrc . '" alt="logo" width="20" />
                 ' . $label . '
             </span>';
-            } else if ($filerecord->state == 12) {
+            } else if ($filerecord->state == plagiarism_pchkorg_state::LOCAL_SENT) {
                 $label = sprintf(get_string('pchkorg_label_sent', 'plagiarism_pchkorg'), $filerecord->textid);
                 return '
                 <span style="padding: 5px 3px;
@@ -652,7 +737,8 @@ display: inline-block;"
             sprintf(
                 '%s (%s)',
                 get_string('pchkorg_debug_no_check', 'plagiarism_pchkorg'),
-                $cmid),
+                $cmid
+            ),
             $isdebugenabled
         );
     }
@@ -706,7 +792,7 @@ display: inline-block;"
             return '';
         }
         $modulename = $cm->modname;
-        $allowedmodules = array('assign', 'mod_assign');
+        $allowedmodules = ['assign', 'mod_assign'];
         if ($configmodel->get_system_config('pchkorg_enable_quiz')) {
             $allowedmodules[] = 'quiz';
         }
@@ -725,7 +811,7 @@ display: inline-block;"
 
         $result .= $OUTPUT->box_start('generalbox boxaligncenter', 'intro');
 
-        $formatoptions = new stdClass;
+        $formatoptions = new stdClass();
         $formatoptions->noclean = true;
 
         $result .= '<div style="background-color: #d5ffd5; padding: 10px; border: 1px solid #b7dab7">';
@@ -741,31 +827,34 @@ display: inline-block;"
      * Method will handle event assessable_uploaded.
      *
      * @param $eventdata
+     * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests; built from config otherwise.
      * @return bool
      * @throws coding_exception
      * @throws dml_exception
      */
-    public function event_handler($eventdata) {
+    public function event_handler($eventdata, $apiprovider = null) {
         global $USER, $DB;
 
         // Whitelist of supported events, ignore other.
-        $issupportedevent = in_array($eventdata['eventtype'], array(
+        $issupportedevent = in_array($eventdata['eventtype'], [
             "forum_attachment",
             "quiz_submitted",
             "assessable_submitted",
-            "content_uploaded"
-        ));
+            "content_uploaded",
+        ]);
         if (!$issupportedevent) {
             return true;
         }
 
         $modulename = $eventdata['other']['modulename'];
-        $allowedmodules = array('assign', 'mod_assign');
+        $allowedmodules = ['assign', 'mod_assign'];
         // We support only assign module so just ignore all other.
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
-        // Token is needed for API auth.
-        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
-        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        if (null === $apiprovider) {
+            // Token is needed for API auth.
+            $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+            $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        }
         // SQL will be called only once, result is static.
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' !== $config) {
@@ -803,31 +892,18 @@ display: inline-block;"
         // Also, we don't use raw users email.
         $ismemberresponse = $apiprovider->get_group_member_response($USER->email);
         $ismember = true;
-        if (!$ismemberresponse->is_member) {
+        if (!$ismemberresponse->is_known) {
+            // The service could not be reached or answered with something we
+            // could not parse. We don't know whether this user is a member,
+            // so queue the submission rather than fail it outright: the send
+            // step retries on transient failures and can reject it later
+            // with a concrete reason if the user genuinely is not a member.
+            $ismember = true;
+        } else if (!$ismemberresponse->is_member) {
             if ($ismemberresponse->is_auto_registration_enabled) {
                 $name = $USER->firstname . ' ' . $USER->lastname;
-                $roleDatas = get_user_roles($context, $USER->id, true);
-                $roles = array();
-                foreach ($roleDatas as $rolesData) {
-                    $roles[] = strtolower($rolesData->shortname);
-                }
                 // Moodle has multiple roles in courses.
-                $isstudent = !in_array('teacher', $roles)
-                    && !in_array('editingteacher', $roles)
-                    && !in_array('managerteacher', $roles)
-                    // Popular custom teacher roles.
-                    && !in_array('l', $roles)
-                    && !in_array('ta', $roles)
-                    && !in_array('cce', $roles)
-                    && !in_array('hod', $roles)
-                    && !in_array('cl', $roles)
-                    && !in_array('ca', $roles)
-                    && !in_array('lib', $roles)
-                    && !in_array('led', $roles)
-                    && !in_array('id', $roles)
-                    && !in_array('adt1', $roles)
-                    && !in_array('adt1tii', $roles)
-                    && !in_array('manager', $roles);
+                $isstudent = plagiarism_pchkorg_roles::is_student($context, $USER->id);
                 $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
                 if (!$isregistered) {
                     $ismember = false;
@@ -840,25 +916,26 @@ display: inline-block;"
         // Set the author and submitter.
         $submitter = $eventdata['userid'];
 
-        // Related user ID will be NULL if an instructor submits on behalf of a student who is in a group.
-        // To get around this, we get the group ID, get the group members and set the author as the first student in the group.
-        if ((empty($eventdata['relateduserid'])) && ($eventdata['other']['modulename'] == 'assign')
-            && has_capability('mod/assign:editothersubmission', $context, $submitter)) {
-            $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id, groupid');
-        }
+        // Related user ID is NULL when an instructor submits on behalf of a student in a
+        // group. The intent was to look the group up and attribute the submission to one of
+        // its students, but that was never finished: the record was fetched and discarded,
+        // and the helper meant to pick the author was unreachable. Such submissions are
+        // therefore attributed to the submitting instructor.
 
-        if ($eventdata['other']['modulename'] === 'forum'
-            && $eventdata['eventtype'] === 'forum_attachment') {
+        if (
+            $eventdata['other']['modulename'] === 'forum'
+            && $eventdata['eventtype'] === 'forum_attachment'
+        ) {
             if (!empty($eventdata['other']['content'])) {
                 $content = trim(strip_tags($eventdata['other']['content']));
                 if (strlen($content) > 80) {
                     $signature = sha1($content);
-                    $filesconditions = array(
+                    $filesconditions = [
                         'signature' => $signature,
                         'cm' => $cmid,
                         'userid' => $USER->id,
-                        'itemid' => $eventdata['objectid']
-                    );
+                        'itemid' => $eventdata['objectid'],
+                    ];
                     $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
                     if (!$oldfile) {
                         $filerecord = new \stdClass();
@@ -870,13 +947,13 @@ display: inline-block;"
                         $filerecord->itemid = $eventdata['objectid'];
                         $filerecord->signature = $signature;
                         if ($ismember) {
-                            $filerecord->state = 10;
+                            $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
                         } else {
-                            $filerecord->message = sprintf(
+                            $filerecord->message = self::truncate_message(sprintf(
                                 'User %s is not a member of group',
-                                $USER->email,
-                            );
-                            $filerecord->state = 11; // Sending error.
+                                $USER->email
+                            ));
+                            $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                         }
 
                         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
@@ -908,9 +985,9 @@ display: inline-block;"
                         continue;
                     }
                     $signature = sha1($content);
-                    $filesconditions = array(
-                        'fileid' => $file->get_id()
-                    );
+                    $filesconditions = [
+                        'fileid' => $file->get_id(),
+                    ];
                     $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
                     if (!$oldfile) {
                         $filerecord = new \stdClass();
@@ -922,13 +999,13 @@ display: inline-block;"
                         $filerecord->itemid = $eventdata['objectid'];
                         $filerecord->signature = $signature;
                         if ($ismember) {
-                            $filerecord->state = 10;
+                            $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
                         } else {
-                            $filerecord->message = sprintf(
+                            $filerecord->message = self::truncate_message(sprintf(
                                 'User %s is not a member of group',
-                                $USER->email,
-                            );
-                            $filerecord->state = 11; // Sending error.
+                                $USER->email
+                            ));
+                            $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                         }
 
                         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
@@ -939,9 +1016,10 @@ display: inline-block;"
             return true;
         }
 
-        if ($eventdata['other']['modulename'] === 'quiz'
-            && $eventdata['eventtype'] === 'quiz_submitted') {
-
+        if (
+            $eventdata['other']['modulename'] === 'quiz'
+            && $eventdata['eventtype'] === 'quiz_submitted'
+        ) {
             $attempt = quiz_attempt::create($eventdata['objectid']);
             foreach ($attempt->get_slots() as $slot) {
                 $questionattempt = $attempt->get_question_attempt($slot);
@@ -951,12 +1029,12 @@ display: inline-block;"
                     $content = $questionattempt->get_response_summary();
                     if (strlen($content) > 80) {
                         $signature = sha1($content);
-                        $filesconditions = array(
+                        $filesconditions = [
                             'signature' => $signature,
                             'cm' => $cmid,
                             'userid' => $USER->id,
-                            'itemid' => $eventdata['objectid']
-                        );
+                            'itemid' => $eventdata['objectid'],
+                        ];
 
                         $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
                         if ($oldfile) {
@@ -973,13 +1051,13 @@ display: inline-block;"
                         $filerecord->itemid = $eventdata['objectid'];
                         $filerecord->signature = $signature;
                         if ($ismember) {
-                            $filerecord->state = 10;
+                            $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
                         } else {
-                            $filerecord->message = sprintf(
+                            $filerecord->message = self::truncate_message(sprintf(
                                 'User %s is not a member of group',
-                                $USER->email,
-                            );
-                            $filerecord->state = 11; // Sending error.
+                                $USER->email
+                            ));
+                            $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                         }
                         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                     }
@@ -1006,9 +1084,9 @@ display: inline-block;"
                             continue;
                         }
                         $signature = sha1($content);
-                        $filesconditions = array(
-                            'fileid' => $file->get_id()
-                        );
+                        $filesconditions = [
+                            'fileid' => $file->get_id(),
+                        ];
                         $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
                         if (!$oldfile) {
                             $filerecord = new \stdClass();
@@ -1020,13 +1098,13 @@ display: inline-block;"
                             $filerecord->itemid = $eventdata['objectid'];
                             $filerecord->signature = $signature;
                             if ($ismember) {
-                                $filerecord->state = 10;
+                                $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
                             } else {
-                                $filerecord->message = sprintf(
+                                $filerecord->message = self::truncate_message(sprintf(
                                     'User %s is not a member of group',
-                                    $USER->email,
-                                );
-                                $filerecord->state = 11; // Sending error.
+                                    $USER->email
+                                ));
+                                $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                             }
                             $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                         }
@@ -1037,24 +1115,28 @@ display: inline-block;"
 
         // Get actual text content and files to be submitted for draft submissions.
         // As this won't be present in eventdata for certain event types.
-        if ($eventdata['other']['modulename'] === 'assign'
-            && $eventdata['eventtype'] === 'assessable_submitted') {
-
+        if (
+            $eventdata['other']['modulename'] === 'assign'
+            && $eventdata['eventtype'] === 'assessable_submitted'
+        ) {
             // Get content.
-            $moodlesubmission = $DB->get_record('assign_submission', array('id' => $eventdata['objectid']), 'id');
+            $moodlesubmission = $DB->get_record('assign_submission', ['id' => $eventdata['objectid']], 'id');
 
-            $moodletextsubmission = $DB->get_record('assignsubmission_onlinetext',
-                array('submission' => $eventdata['objectid']), 'onlinetext');
+            $moodletextsubmission = $DB->get_record(
+                'assignsubmission_onlinetext',
+                ['submission' => $eventdata['objectid']],
+                'onlinetext'
+            );
 
             if ($moodletextsubmission) {
                 $eventdata['other']['content'] = $moodletextsubmission->onlinetext;
             }
 
-            $filesconditions = array(
+            $filesconditions = [
                 'component' => 'assignsubmission_file',
                 'itemid' => $eventdata['objectid'],
-                'userid' => $eventdata['userid']
-            );
+                'userid' => $eventdata['userid'],
+            ];
 
             $moodlefiles = $DB->get_records('files', $filesconditions);
             if ($moodlefiles) {
@@ -1094,13 +1176,13 @@ display: inline-block;"
                     $filerecord->itemid = $eventdata['objectid'];
                     $filerecord->signature = sha1($content);
                     if ($ismember) {
-                        $filerecord->state = 10;
+                        $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
                     } else {
-                        $filerecord->message = sprintf(
+                        $filerecord->message = self::truncate_message(sprintf(
                             'User %s is not a member of group',
-                            $USER->email,
-                        );
-                        $filerecord->state = 11; // Sending error.
+                            $USER->email
+                        ));
+                        $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                     }
                     $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
                 }
@@ -1109,18 +1191,19 @@ display: inline-block;"
 
         // Queue text content to send to plagiarismcheck.org.
         // If there was an error when creating the assignment then still queue the submission so it can be saved as failed.
-        if ($eventdata['other']['modulename'] === 'assign'
-            && in_array($eventdata['eventtype'], array("content_uploaded", "assessable_submitted"))
-            && !empty($eventdata['other']['content'])) {
-
+        if (
+            $eventdata['other']['modulename'] === 'assign'
+            && in_array($eventdata['eventtype'], ["content_uploaded", "assessable_submitted"])
+            && !empty($eventdata['other']['content'])
+        ) {
             $signature = sha1($eventdata['other']['content']);
 
-            $filesconditions = array(
+            $filesconditions = [
                 'signature' => $signature,
                 'cm' => $cmid,
                 'userid' => $USER->id,
-                'itemid' => $eventdata['objectid']
-            );
+                'itemid' => $eventdata['objectid'],
+            ];
 
             $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
             if ($oldfile) {
@@ -1137,13 +1220,13 @@ display: inline-block;"
             $filerecord->itemid = $eventdata['objectid'];
             $filerecord->signature = $signature;
             if ($ismember) {
-                $filerecord->state = 10;
+                $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
             } else {
-                $filerecord->message = sprintf(
+                $filerecord->message = self::truncate_message(sprintf(
                     'User %s is not a member of group',
-                    $USER->email,
-                );
-                $filerecord->state = 11; // Sending error.
+                    $USER->email
+                ));
+                $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
             }
             $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
         }
@@ -1151,7 +1234,16 @@ display: inline-block;"
         return true;
     }
 
-    public function cron_auto_registrate_teachers() {
+    /**
+     * Register teachers of plugin-enabled courses with the service.
+     *
+     * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests; built from config otherwise.
+     * @return bool
+     * @throws moodle_exception When the service could not confirm the auto-registration
+     *                           setting for a user, so Moodle records this task run as failed
+     *                           instead of silently succeeding.
+     */
+    public function cron_auto_registrate_teachers($apiprovider = null) {
         global $DB;
 
         $configmodel = new plagiarism_pchkorg_config_model();
@@ -1182,54 +1274,60 @@ display: inline-block;"
             }
             return true;
         }
-        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        if (null === $apiprovider) {
+            $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        }
 
-        // This SQL fetches all teachers in courses where plugin is enabled.
-        // And teachers not already imported.
-        $sql = 'SELECT u.email as email,
-                CONCAT(u.firstname, \' \', u.lastname) as name
-            FROM {user} u
-                INNER JOIN {user_enrolments} ue ON ue.userid = u.id
-                INNER JOIN {enrol} e ON e.id = ue.enrolid
-                INNER JOIN {context} ctx_user ON ctx_user.instanceid = u.id AND ctx_user.contextlevel = 30 -- CONTEXT_USER
-                INNER JOIN {role_assignments}  ON {role_assignments}.userid = u.id
-                INNER JOIN {role} ON {role_assignments}.roleid = {role}.id
-                INNER JOIN {context} ctx_course ON ctx_course.id = {role_assignments}.contextid AND ctx_course.contextlevel = 50 -- CONTEXT_COURSE
-            WHERE u.deleted = 0
-                AND {role}.shortname IN (
-                    \'manager\',
-                    \'coursecreator\',
-                    \'editingteacher\',
-                    \'teacher\',
-                    \'l\',
-                    \'ta\',
-                    \'cce\',
-                    \'hod\',
-                    \'cl\',
-                    \'ca\',
-                    \'lib\',
-                    \'led\',
-                    \'id\',
-                    \'adt1\',
-                    \'adt1tii\',
-                    \'manager\'
-                )
-                AND e.courseid IN (
-                    SELECT DISTINCT {course}.id as emabled_in_course
-                    FROM {assign}
-                        INNER JOIN {course_modules} ON {course_modules}.instance = {assign}.id
-                        INNER JOIN {plagiarism_pchkorg_config} ON {plagiarism_pchkorg_config}.cm = {course_modules}.id
-                        INNER JOIN {course} ON {course}.id = {course_modules}.course AND {assign}.course = {course}.id
-                        INNER JOIN {modules} ON {modules}.id = {course_modules}.module
-                    WHERE {plagiarism_pchkorg_config}.value = 1
-                        AND {plagiarism_pchkorg_config}.name = \'pchkorg_module_use\'
-                        AND {modules}.name = \'assign\'
-                )  AND NOT EXISTS (SELECT 1 FROM {plagiarism_pchkorg_users} WHERE {plagiarism_pchkorg_users}.email = u.email LIMIT 1)
-            GROUP BY u.id
-            ORDER BY e.courseid DESC
-            LIMIT 50;';
+        // This SQL fetches all teachers in courses where plugin is enabled,
+        // and which have not been imported yet.
+        //
+        // Everything here is written for cross-database portability: LIMIT and
+        // CONCAT are MySQL spellings, string columns must not be compared to
+        // integers, and ordering by a column that is neither selected nor
+        // grouped is rejected outside MySQL.
+        [$rolesql, $roleparams] = $DB->get_in_or_equal(
+            plagiarism_pchkorg_roles::teacher_shortnames(),
+            SQL_PARAMS_NAMED,
+            'role'
+        );
+        $namesql = $DB->sql_concat('u.firstname', "' '", 'u.lastname');
 
-        $records = $DB->get_records_sql($sql);
+        $sql = "SELECT DISTINCT u.id, u.email, {$namesql} AS name
+                  FROM {user} u
+                  JOIN {user_enrolments} ue ON ue.userid = u.id
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {role_assignments} ra ON ra.userid = u.id
+                  JOIN {role} r ON r.id = ra.roleid
+                  JOIN {context} ctxcourse ON ctxcourse.id = ra.contextid
+                       AND ctxcourse.contextlevel = :coursecontext
+                 WHERE u.deleted = 0
+                   AND r.shortname {$rolesql}
+                   AND e.courseid IN (
+                       SELECT c.id
+                         FROM {assign} a
+                         JOIN {course_modules} cm ON cm.instance = a.id
+                         JOIN {modules} m ON m.id = cm.module
+                         JOIN {plagiarism_pchkorg_config} pc ON pc.cm = cm.id
+                         JOIN {course} c ON c.id = cm.course AND a.course = c.id
+                        WHERE pc.value = :enabledvalue
+                          AND pc.name = :configname
+                          AND m.name = :modname
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                         FROM {plagiarism_pchkorg_users} pu
+                        WHERE pu.email = u.email
+                   )
+              ORDER BY u.id";
+
+        $params = array_merge($roleparams, [
+            'coursecontext' => CONTEXT_COURSE,
+            'enabledvalue' => '1',
+            'configname' => 'pchkorg_module_use',
+            'modname' => 'assign',
+        ]);
+
+        $records = $DB->get_records_sql($sql, $params, 0, 50);
         foreach ($records as $record) {
             // Small email validation.
             if (\strpos($record->email, '@') === false) {
@@ -1239,15 +1337,32 @@ display: inline-block;"
                 continue;
             }
             $member = $apiprovider->get_group_member_response($record->email);
-            // This feature is not available for this user. Stop here and disable this feature.
+            if (!$member->is_known) {
+                // The service could not be reached or answered with
+                // something we could not parse. We do not know whether
+                // auto-registration is enabled, so leave the administrator's
+                // setting untouched and stop this run rather than guess.
+                if ($isdebugenabled) {
+                    echo sprintf(
+                        'cron_auto_registrate_teachers: Could not confirm auto-registration status for %s.',
+                        $record->email
+                    );
+                }
+                throw new moodle_exception('pchkorg_auto_registration_unavailable', 'plagiarism_pchkorg');
+            }
+            // Auto-registration is off for this group. Stop here and disable this feature site-wide,
+            // since the setting is a property of the group, not of the individual user.
             if (!$member->is_auto_registration_enabled) {
+                if ($isdebugenabled) {
+                    echo 'cron_auto_registrate_teachers: Auto-registration is disabled for this group.';
+                }
                 set_config('pchkorg_teacher_auto_registration', '0', 'plagiarism_pchkorg');
                 $configmodel->set_system_config('pchkorg_teacher_auto_registration', '0');
                 return false;
             }
             // User is already registered.
             if ($member->is_member) {
-                $insertdata = new \stdClass;
+                $insertdata = new \stdClass();
                 $insertdata->email = $record->email;
                 $DB->insert_record('plagiarism_pchkorg_users', $insertdata);
             } else {
@@ -1255,7 +1370,7 @@ display: inline-block;"
                 $success = $apiprovider->auto_registrate_member($record->name, $record->email, 2);
                 // Operation is successful.
                 if ($success) {
-                    $insertdata = new \stdClass;
+                    $insertdata = new \stdClass();
                     $insertdata->email = $record->email;
                     $DB->insert_record('plagiarism_pchkorg_users', $insertdata);
                 }
@@ -1267,48 +1382,28 @@ display: inline-block;"
 
     /**
      *
-     * Will find the first user in group assignment.
-     *
-     * @param $cmid
-     * @param $groupid
-     * @return mixed
-     * @throws coding_exception
-     */
-    private function get_first_group_author($cmid, $groupid) {
-        static $context;
-        if (empty($context)) {
-            $context = context_course::instance($cmid);
-        }
-
-        $groupmembers = groups_get_members($groupid, "u.id");
-        foreach ($groupmembers as $author) {
-            if (!has_capability('mod/assign:grade', $context, $author->id)) {
-                return $author->id;
-            }
-        }
-    }
-
-    /**
-     *
      * Method will be called by cron. Method sends queued files into plagiarism check system.
      *
+     * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests; built from config otherwise.
      * @return bool
      * @throws coding_exception
      * @throws dml_exception
      */
-    public function cron_send_submissions() {
+    public function cron_send_submissions($apiprovider = null) {
         global $DB;
 
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
-        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
-        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        if (null === $apiprovider) {
+            $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+            $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        }
 
         // SQL will be called only once, result is static.
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
         if ('1' !== $config) {
             return true;
         }
-        $filesconditions = array('state' => 10);
+        $filesconditions = ['state' => plagiarism_pchkorg_state::LOCAL_QUEUED];
         $moodlefiles = $DB->get_records(
             'plagiarism_pchkorg_files',
             $filesconditions,
@@ -1318,287 +1413,144 @@ display: inline-block;"
             20
         );
 
-        if ($moodlefiles) {
-            $fs = get_file_storage();
-            foreach ($moodlefiles as $filedb) {
-                $textid = null;
-                $user = $DB->get_record('user', array('id' => $filedb->userid));
-                // This is attached file.
-                $cm = get_coursemodule_from_id('', $filedb->cm);
-                // Filter for future search.
-                $systemminpercent = $pchkorgconfigmodel->get_system_config('pchkorg_min_percent');
-                // Module filter value has a bigger priority then system config value.
-                $moduleminpercent = $pchkorgconfigmodel->get_filter_for_module($cm->id, 'pchkorg_min_percent');
-                if ($moduleminpercent) {
-                    $minpercent = $moduleminpercent;
-                } else {
-                    $minpercent = $systemminpercent;
-                }
-                $filters = array(
-                    'include_references' => $pchkorgconfigmodel->get_filter_for_module(
-                        $cm->id,
-                        'pchkorg_include_referenced'
-                    ),
-                    'include_quotes' => $pchkorgconfigmodel->get_filter_for_module(
-                        $cm->id,
-                        'pchkorg_include_citation'
-                    ),
-                    'exclude_self_plagiarism' => $pchkorgconfigmodel->get_filter_for_module(
-                        $cm->id,
-                        'pchkorg_exclude_self_plagiarism'
-                    ),
-                );
-                if ($minpercent) {
-                    $filters['source_min_percent'] = $minpercent;
-                }
+        if (!$moodlefiles) {
+            return true;
+        }
 
-                $agreementwhere = array(
-                    'cm' => 0,
-                    'name' => 'accepted_agreement',
-                    'value' => '1',
-                );
-                $agreementaccepted = $DB->get_records('plagiarism_pchkorg_config', $agreementwhere);
-                if (empty($agreementaccepted)) {
-                    $apiprovider->save_accepted_agreement($user->email);
-                    $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
-                }
+        // One query for every author in the batch, rather than one per record.
+        $userids = [];
+        foreach ($moodlefiles as $filedb) {
+            $userids[$filedb->userid] = $filedb->userid;
+        }
+        $users = $DB->get_records_list('user', 'id', $userids);
 
-                if ($cm->modname === 'quiz') {
-                    if ($filedb->fileid === null) {
+        // The agreement is site-wide, so it is settled once for the whole run.
+        $this->accept_agreement_once($apiprovider, $users);
 
-                        $questionanswers = $DB->get_records_sql(
-                            "SELECT {question_attempts}.responsesummary "
-                            ." FROM {question_attempts} "
-                            ." INNER JOIN  {question} on  {question}.id =  {question_attempts}.questionid "
-                            ." INNER JOIN {quiz_attempts} on {quiz_attempts}.uniqueid = {question_attempts}.questionusageid "
-                            ." WHERE   {quiz_attempts}.id= ? AND  {question}.qtype = 'essay' ", array(
-                                $filedb->itemid
-                            )
-                        );
+        $sender = new plagiarism_pchkorg_sender($apiprovider, $pchkorgconfigmodel);
 
-                        foreach ($questionanswers as $questionanswer) {
-                            $content = $questionanswer->responsesummary;
-                            $signature = sha1($content);
-                            if ($signature === $filedb->signature) {
-                                $textid = $apiprovider->general_send_check(
-                                    $apiprovider->user_email_to_hash($user->email),
-                                    $cm->course,
-                                    $cm->id,
-                                    $cm->name,
-                                    $filedb->itemid,
-                                    $signature,
-                                    html_to_text($content, 75, false),
-                                    'plain/text',
-                                    sprintf('%s-quiz.txt', $filedb->itemid),
-                                    $filters
-                                );
-                                break;
-                            }
-                        }
-                    } else {
-                        $file = $fs->get_file_by_id($filedb->fileid);
-                        // We can not receive file by id.
-                        // Maybe file does not exist anymore.
-                        // So we mark it as error and continue.
-                        if (!$file || !is_object($file)) {
-                            $filedbnew = new stdClass();
-                            $filedbnew->id = $filedb->id;
-                            $filedbnew->attempt = $filedb->attempt + 1;
-                            $filedbnew->state = 11; // Sending error.
+        foreach ($moodlefiles as $filedb) {
+            $user = array_key_exists($filedb->userid, $users) ? $users[$filedb->userid] : null;
+            $cm = get_coursemodule_from_id('', $filedb->cm);
 
-                            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
-
-                            continue;
-                        }
-                        $textid = $apiprovider->general_send_check(
-                            $apiprovider->user_email_to_hash($user->email),
-                            $cm->course,
-                            $cm->id,
-                            $cm->name,
-                            $filedb->itemid,
-                            $file->get_id(),
-                            $file->get_content(),
-                            $file->get_mimetype(),
-                            $file->get_filename(),
-                            $filters
-                        );
-                    }
-                }
-                if ($cm->modname === 'forum') {
-                    if ($filedb->fileid === null) {
-                        $post = $DB->get_record_sql(
-                            "SELECT subject, message"
-                            ." FROM {forum_posts}"
-                            ." WHERE {forum_posts}.id = ?", array(
-                                $filedb->itemid
-                            )
-                        );
-                        if ($post) {
-                            $subject = $post->subject;
-                            $content = $post->message;
-                            $signature = sha1($content);
-                            $ismatched = false;
-                            if ($signature === $filedb->signature) {
-                                $ismatched = true;
-                            }
-                            if (!$ismatched) {
-                                $signature = sha1(trim(strip_tags($content)));
-                                if ($signature === $filedb->signature) {
-                                    $ismatched = true;
-                                }
-                            }
-
-                            if ($ismatched) {
-                                $textid = $apiprovider->general_send_check(
-                                    $apiprovider->user_email_to_hash($user->email),
-                                    $cm->course,
-                                    $cm->id,
-                                    $cm->name,
-                                    $subject,
-                                    $signature,
-                                    html_to_text($content, 75, false),
-                                    'plain/text',
-                                    sprintf('%s-quiz.txt', $filedb->itemid),
-                                    $filters
-                                );
-                            }
-                        }
-                    } else {
-                        $moodlesubmission = $DB->get_record('assign_submission', array(
-                            'assignment' => $cm->instance,
-                            'userid' => $filedb->userid,
-                            'id' => $filedb->itemid,
-                        ), 'id');
-                        $file = $fs->get_file_by_id($filedb->fileid);
-
-                        // We can not receive file by id.
-                        // Maybe file does not exist anymore.
-                        // So we mark it as error and continue.
-                        if (!$file || !is_object($file)) {
-                            $filedbnew = new stdClass();
-                            $filedbnew->id = $filedb->id;
-                            $filedbnew->attempt = $filedb->attempt + 1;
-                            $filedbnew->state = 11; // Sending error.
-
-                            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
-
-                            continue;
-                        }
-                        $textid = $apiprovider->general_send_check(
-                            $apiprovider->user_email_to_hash($user->email),
-                            $cm->course,
-                            $cm->id,
-                            $cm->name,
-                            $moodlesubmission->id,
-                            $file->get_id(),
-                            $file->get_content(),
-                            $file->get_mimetype(),
-                            $file->get_filename(),
-                            $filters
-                        );
-                    }
-                }
-                if ($cm->modname === 'assign') {
-                    if ($filedb->fileid === null) {
-                        $moodletextsubmission = $DB->get_record(
-                            'assignsubmission_onlinetext',
-                            array('submission' => $filedb->itemid),
-                            '*'
-                        );
-                        if ($moodletextsubmission) {
-                            $content = $moodletextsubmission->onlinetext;
-                            $textid = $apiprovider->general_send_check(
-                                $apiprovider->user_email_to_hash($user->email),
-                                $cm->course,
-                                $cm->id,
-                                $cm->name,
-                                $moodletextsubmission->id,
-                                $moodletextsubmission->id,
-                                html_to_text($content, 75, false),
-                                'plain/text',
-                                sprintf('%s-submussion.txt', $moodletextsubmission->id),
-                                $filters
-                            );
-                        }
-                    } else {
-                        $moodlesubmission = $DB->get_record('assign_submission', array(
-                            'assignment' => $cm->instance,
-                            'userid' => $filedb->userid,
-                            'id' => $filedb->itemid,
-                        ), 'id');
-                        $file = $fs->get_file_by_id($filedb->fileid);
-
-                        // We can not receive file by id.
-                        // Maybe file does not exist anymore.
-                        // So we mark it as error and continue.
-                        if (!$file || !is_object($file)) {
-                            $filedbnew = new stdClass();
-                            $filedbnew->id = $filedb->id;
-                            $filedbnew->attempt = $filedb->attempt + 1;
-                            $filedbnew->state = 11; // Sending error.
-
-                            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
-
-                            continue;
-                        }
-                        $textid = $apiprovider->general_send_check(
-                            $apiprovider->user_email_to_hash($user->email),
-                            $cm->course,
-                            $cm->id,
-                            $cm->name,
-                            $moodlesubmission->id,
-                            $file->get_id(),
-                            $file->get_content(),
-                            $file->get_mimetype(),
-                            $file->get_filename(),
-                            $filters
-                        );
-                    }
-                }
-
-                $filedbnew = new stdClass();
-                $filedbnew->id = $filedb->id;
-                if ($textid) {
-                    // Text was successfully sent to the service.
-                    $filedbnew->textid = $textid;
-                    $filedbnew->state = 12; // 12 - is SENT.
-                } else {
-                    $filedbnew->attempt = $filedb->attempt + 1;
-                    // When more than 6 attempts or we know concrete reason of failure.
-                    // There is no reasone to future attempt.
-                    $lasterrormessage = $apiprovider->get_last_error();
-                    if (!empty($lasterrormessage)) {
-                        $apiprovider->set_last_error(null);
-                        // Database column has maximum length 130 characters.
-                        if (strlen($lasterrormessage) > 130) {
-                            $lasterrormessage = substr($lasterrormessage, 0, 130);
-                        }
-                        $filedbnew->message = $lasterrormessage;
-                        $filedbnew->state = 11; // Sending error.
-                    }
-                    if ($filedbnew->attempt > 6) {
-                        $filedbnew->state = 11; // Sending error.
-                    }
-                }
-                $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+            // The author or the course module may have been deleted since the
+            // record was queued. Neither can be recovered, so fail the item and
+            // move on rather than fataling and stalling the whole batch.
+            if (!$user || !$cm) {
+                $this->fail_submission($filedb);
+                continue;
             }
+
+            $result = $sender->send($filedb, $cm, $user);
+            $this->record_send_result($filedb, $result, $apiprovider);
         }
 
         return true;
     }
 
     /**
+     * Tell the service the agreement was accepted, once per site.
+     *
+     * @param plagiarism_pchkorg_api_provider $apiprovider
+     * @param array $users Users in the current batch, for the acting email.
+     * @return void
+     */
+    private function accept_agreement_once($apiprovider, array $users) {
+        global $DB;
+
+        $agreementwhere = [
+            'cm' => 0,
+            'name' => 'accepted_agreement',
+            'value' => '1',
+        ];
+        if ($DB->record_exists('plagiarism_pchkorg_config', $agreementwhere)) {
+            return;
+        }
+
+        $user = reset($users);
+        if (!$user) {
+            return;
+        }
+
+        $apiprovider->save_accepted_agreement($user->email);
+        $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
+    }
+
+    /**
+     * Mark a queued record as permanently failed.
+     *
+     * @param stdClass $filedb
+     * @return void
+     */
+    private function fail_submission($filedb) {
+        global $DB;
+
+        $filedbnew = new stdClass();
+        $filedbnew->id = $filedb->id;
+        $filedbnew->attempt = $filedb->attempt + 1;
+        $filedbnew->state = plagiarism_pchkorg_state::LOCAL_ERROR;
+
+        $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+    }
+
+    /**
+     * Apply the outcome of one send attempt to the queue record.
+     *
+     * @param stdClass $filedb
+     * @param stdClass $result From plagiarism_pchkorg_sender::send().
+     * @param plagiarism_pchkorg_api_provider $apiprovider
+     * @return void
+     */
+    private function record_send_result($filedb, $result, $apiprovider) {
+        global $DB;
+
+        if (plagiarism_pchkorg_sender::RESULT_FAILED === $result->status) {
+            $this->fail_submission($filedb);
+            return;
+        }
+
+        $filedbnew = new stdClass();
+        $filedbnew->id = $filedb->id;
+
+        if (plagiarism_pchkorg_sender::RESULT_SENT === $result->status) {
+            // Text was successfully sent to the service.
+            $filedbnew->textid = $result->textid;
+            $filedbnew->state = plagiarism_pchkorg_state::LOCAL_SENT;
+            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+            return;
+        }
+
+        $filedbnew->attempt = $filedb->attempt + 1;
+        // When more than 6 attempts or we know concrete reason of failure.
+        // There is no reasone to future attempt.
+        $lasterrormessage = $apiprovider->get_last_error();
+        if (!empty($lasterrormessage)) {
+            $apiprovider->set_last_error(null);
+            $filedbnew->message = self::truncate_message($lasterrormessage);
+            $filedbnew->state = plagiarism_pchkorg_state::LOCAL_ERROR;
+        }
+        if ($filedbnew->attempt > 6) {
+            $filedbnew->state = plagiarism_pchkorg_state::LOCAL_ERROR;
+        }
+
+        $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+    }
+
+    /**
      * Method will update similarity score and change status of checks.
      *
+     * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests; built from config otherwise.
      * @return bool
      * @throws dml_exception
      */
-    public function cron_update_reports() {
+    public function cron_update_reports($apiprovider = null) {
         global $DB;
 
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
-        $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
-        $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        if (null === $apiprovider) {
+            $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
+            $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        }
 
         // SQL will be called only once, result is static.
         $config = $pchkorgconfigmodel->get_system_config('pchkorg_use');
@@ -1606,10 +1558,16 @@ display: inline-block;"
             return true;
         }
 
-        $filesconditions = array('state' => 12);
+        $filesconditions = ['state' => plagiarism_pchkorg_state::LOCAL_SENT];
 
-        $moodlefiles = $DB->get_records('plagiarism_pchkorg_files', $filesconditions,
-            'id', '*', 0, 20);
+        $moodlefiles = $DB->get_records(
+            'plagiarism_pchkorg_files',
+            $filesconditions,
+            'id',
+            '*',
+            0,
+            20
+        );
 
         foreach ($moodlefiles as $filedb) {
             $report = $apiprovider->check_text($filedb->textid);
@@ -1618,15 +1576,18 @@ display: inline-block;"
                 $filedbnew->id = $filedb->id;
                 $filedbnew->reportid = $report->id;
                 // successful check, all good.
-                if (5 === $report->state) {
-                    $filedbnew->state = 5;
-                    $filedbnew->score = $report->percent;
+                if (plagiarism_pchkorg_state::REMOTE_CHECKED === $report->state) {
+                    $filedbnew->state = plagiarism_pchkorg_state::LOCAL_CHECKED;
+                    // The score column is NOT NULL, so fall back to 0 when the service
+                    // reports a checked text without a similarity percentage. scoreai is
+                    // nullable and stays null when AI detection did not run.
+                    $filedbnew->score = null === $report->percent ? 0 : $report->percent;
                     $filedbnew->scoreai = $report->percent_ai;
                 } else {
                     // Check has been failed for some reason. We cannot check this document.
                     // We can mark this queue-item as failed and move to the next document.
-                    // 11 state will fail document in queue and hide it from the UI.
-                    $filedbnew->state = 11;
+                    // LOCAL_ERROR will fail document in queue and hide it from the UI.
+                    $filedbnew->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                 }
 
                 $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
