@@ -195,6 +195,33 @@ $string['pchkorg_ignore_template_error_storage_error'] = 'The template could not
 $string['pchkorg_ignore_template_error_template_processing_failed'] = 'The template could not be processed.';
 $string['pchkorg_ignore_template_error_unreachable'] = 'PlagiarismCheck.org is unavailable. Please try again later.';
 
+// Re-fetching results for submissions which were already checked.
+$string['pchkorg_refresh_results'] = 'Refresh results';
+$string['pchkorg_refresh_results_help'] =
+    'PlagiarismCheck.org can revise a report after Moodle has stored its scores, for example when a new source is '
+    . 'added to the index. Moodle is not told when that happens, so the similarity and AI scores shown here stay as '
+    . 'they were when the check finished.'
+    . "\n\n"
+    . 'Tick this and save the form to fetch the current scores for every submission in this activity that has a '
+    . 'finished report. No document is checked again and none of your allowance is used: only the scores already '
+    . 'calculated by PlagiarismCheck.org are read again.'
+    . "\n\n"
+    . 'Each score is replaced as it arrives, over the next few runs of the scheduled task. Until then those '
+    . 'submissions show as waiting for a result instead of showing their previous score.'
+    . "\n\n"
+    . 'The box is not saved with the other settings. It is unticked again the next time this form is opened, so '
+    . 'saving the activity later does not refresh anything a second time.';
+$string['pchkorg_refresh_results_label'] = 'Fetch updated results when this form is saved';
+$string['pchkorg_refresh_results_count'] = '{$a} submissions in this activity have a finished report.';
+$string['pchkorg_refresh_results_count_one'] = '1 submission in this activity has a finished report.';
+$string['pchkorg_refresh_results_count_none'] =
+    'No submissions in this activity have a finished report yet, so there is nothing to refresh.';
+$string['pchkorg_refresh_results_queued'] =
+    '{$a} submissions queued. Their scores will be updated over the next few runs of the scheduled task.';
+$string['pchkorg_refresh_results_queued_one'] =
+    '1 submission queued. Its score will be updated over the next few runs of the scheduled task.';
+$string['pchkorg_refresh_results_none'] = 'There were no finished checks in this activity to refresh.';
+
 // Token validation, shown once when settings are saved.
 $string['pchkorg_token_valid'] = 'The PlagiarismCheck.org API token is valid.';
 $string['pchkorg_token_invalid'] = 'The PlagiarismCheck.org API token is invalid.';

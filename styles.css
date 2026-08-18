@@ -117,3 +117,26 @@
     font-size: 0.95em;
     white-space: nowrap;
 }
+
+/* Refresh-results checkbox of the activity settings form. */
+
+.pchkorg-refresh-counter {
+    margin-bottom: 0.5rem;
+}
+
+.pchkorg-refresh-badge {
+    display: inline-block;
+    padding: 0.15em 0.6em;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 10rem;
+    font-size: 0.85em;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+/* The checkbox caption is a label, so show it is clickable. */
+
+.pchkorg-refresh-label {
+    margin-bottom: 0;
+    cursor: pointer;
+}

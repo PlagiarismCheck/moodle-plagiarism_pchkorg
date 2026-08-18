@@ -2,6 +2,25 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.16.2 — 18 August 2026
+
+**New: refreshing results for submissions already checked.** PlagiarismCheck.org
+can revise a report after Moodle has stored its scores, and Moodle was never
+told, because the poll stops asking about a text once its report arrives. The
+plugin's section of the activity settings form now has a **Refresh results**
+checkbox: tick it, save the activity, and every finished check in it is queued
+to be read from the service again, so the scheduled task picks up the current
+similarity and AI scores. Nothing is uploaded or checked a second time and none
+of the institution's allowance is used. Available to anyone who can already
+configure the plugin for the activity. Beside the box is a count of how many
+submissions have a finished report, so it is clear in advance whether ticking it
+will do anything.
+
+The box is deliberately not saved with the other settings: it is unticked again
+whenever the form is reopened, so later saves of the activity do not refresh
+anything a second time. While a submission waits to be re-read it shows as
+waiting for a result rather than showing its previous score.
+
 ## v3.16.1 — 6 August 2026
 
 **Fixed: a service outage could permanently disable teacher auto-registration.**

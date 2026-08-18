@@ -33,6 +33,7 @@ require_once($CFG->libdir . '/accesslib.php');
 require_once(__DIR__ . '/classes/state.php');
 require_once(__DIR__ . '/classes/assignment_key.php');
 require_once(__DIR__ . '/classes/ignore_template_form.php');
+require_once(__DIR__ . '/classes/refresh_results_form.php');
 require_once(__DIR__ . '/classes/roles.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
@@ -241,6 +242,19 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             [get_string('no'), get_string('yes')]
         );
 
+        // Re-fetching results for submissions already checked. Last in the
+        // section because it is an instruction rather than a setting: it is
+        // acted on once when the form is saved and is not stored.
+        //
+        // Only offered while editing. A new activity has no submissions to
+        // refresh, and no course module id to name them by.
+        if (null !== $cm) {
+            $refreshcontext = context_module::instance($cm);
+            if (plagiarism_pchkorg_refresh_results::is_available($pchkorgconfigmodel, $refreshcontext, $cm)) {
+                plagiarism_pchkorg_refresh_results_form::add_elements($mform, $cm);
+            }
+        }
+
         // Ignored templates. Offered for every activity type this plugin
         // handles, not only assignments: the key identifying the activity to
         // the service is built from a course module id, which a quiz and a
@@ -327,12 +341,26 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
         }
     }
 
+    // The loop above wrote the activity's settings straight through $DB, which
+    // the config model caches for the life of the request and cannot see. The
+    // form was defined earlier in this same request, so those caches are
+    // already populated with the values as they were before this save. Discard
+    // them, or anything below reads the settings the teacher has just changed.
+    plagiarism_pchkorg_config_model::reset_caches();
+
     // Ignored assignment templates. A failure here must not abort saving the
     // activity, so it is reported as a notification and the rest of the
     // settings are kept.
     $templateerror = plagiarism_pchkorg_ignore_template_form::save($data, $pchkorgconfigmodel);
     if (null !== $templateerror) {
         \core\notification::error(plagiarism_pchkorg_ignore_template_form::error_message($templateerror));
+    }
+
+    // Refreshing results. Reported as a notification because saving the form
+    // redirects away from it, leaving nowhere to show the outcome in place.
+    if (!empty($data->{plagiarism_pchkorg_refresh_results_form::FIELD})) {
+        $refreshed = plagiarism_pchkorg_refresh_results_form::save($data, $pchkorgconfigmodel);
+        \core\notification::success(plagiarism_pchkorg_refresh_results::result_message($refreshed));
     }
 
     return $data;
