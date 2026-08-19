@@ -142,9 +142,81 @@ class sender_test extends \advanced_testcase {
         $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
         $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
 
+        $this->assertSame('42', $this->sent_min_percent($transport));
+    }
+
+    /**
+     * A threshold of 0 is a teacher turning filtering off for the activity, so
+     * it beats the site-wide value rather than being read as "unset".
+     *
+     * This is the case the setting was reported broken for: 0 used to leave the
+     * field out of the request, and the service went on filtering by whatever
+     * it had last been told.
+     */
+    public function test_zero_module_threshold_overrides_site_threshold(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.', ['pchkorg_min_percent' => '0']);
+        $this->set_site_config('pchkorg_min_percent', '7');
+        \plagiarism_pchkorg_config_model::reset_caches();
+
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('0', $this->sent_min_percent($transport));
+    }
+
+    /**
+     * An activity with no threshold of its own defers to the site-wide one.
+     */
+    public function test_site_threshold_is_used_without_a_module_one(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.');
+        $this->set_site_config('pchkorg_min_percent', '7');
+        \plagiarism_pchkorg_config_model::reset_caches();
+
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('7', $this->sent_min_percent($transport));
+    }
+
+    /**
+     * With no threshold anywhere the field still travels, as 0. Omitting it
+     * would leave a threshold the service was told about earlier in force for
+     * every later submission, which is what made clearing one look ignored.
+     */
+    public function test_threshold_is_sent_even_when_nothing_is_configured(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.');
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('0', $this->sent_min_percent($transport));
+    }
+
+    /**
+     * The source_min_percent value in a multipart body.
+     *
+     * Read out of the body rather than asserted against as a substring: the
+     * number alone appears in course and activity ids too, so a bare
+     * assertStringContainsString('0') would pass on almost anything.
+     *
+     * @param \plagiarism_pchkorg_fake_transport $transport
+     * @return string|null Value sent, or null when the field was left out.
+     */
+    private function sent_min_percent($transport) {
         $body = $transport->request()['params'];
-        $this->assertStringContainsString('name="source_min_percent"', $body);
-        $this->assertStringContainsString('42', $body);
+
+        $matched = preg_match(
+            '/name="source_min_percent"\r\n\r\n(.*)\r\n/',
+            $body,
+            $matches
+        );
+
+        return $matched ? $matches[1] : null;
     }
 
     /**

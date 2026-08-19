@@ -2,6 +2,34 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.16.3 — 19 August 2026
+
+**Fixed: lowering or clearing "Exclude sources below X% similarity" had no
+effect.** Setting the threshold to 0 to stop filtering left the previous value
+in force, and every later submission to that activity was still filtered by it.
+The plugin treated 0 as "nothing configured", discarded the setting instead of
+storing it, and then left the value out of the submission entirely — and
+PlagiarismCheck.org keeps the last threshold it was told for an activity, so it
+went on applying the old one. The threshold is now stored and sent as given,
+including 0, and an activity that had already got into this state corrects
+itself on its next submission with no cleanup needed.
+
+An empty field and 0 now mean different things: **empty** defers to the
+site-wide threshold, as before, while **0** turns source filtering off for that
+activity whatever the site-wide setting says. Raising or lowering the threshold
+between two non-zero values was never affected.
+
+Note that a threshold applies when a submission is checked, so changing it
+affects work submitted afterwards. Reports already returned keep the filtering
+they were produced with; **Refresh results** re-reads the stored scores and does
+not re-filter them.
+
+**Fixed: saving an activity could silently discard its threshold.** On a site
+where a role is denied *Allow changing "Exclude sources below X% similarity"*,
+the field is shown disabled and so is not submitted — which the plugin read as 0
+and deleted the stored value. Saving an activity now leaves a threshold that
+user cannot edit exactly as it was.
+
 ## v3.16.2 — 18 August 2026
 
 **New: refreshing results for submissions already checked.** PlagiarismCheck.org

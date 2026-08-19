@@ -174,14 +174,20 @@ class plagiarism_pchkorg_sender {
         $filters['ignore_templates_enabled'] =
             '1' === $this->configmodel->get_system_config('pchkorg_enable_ignore_templates') ? '1' : '0';
 
-        // The per-activity threshold wins over the site-wide one.
+        // The per-activity threshold wins over the site-wide one. The test is
+        // for a stored value rather than a truthy one: a stored 0 is a teacher
+        // saying this activity filters nothing, and must beat a site-wide
+        // threshold rather than be mistaken for having set nothing at all.
         $minpercent = $this->configmodel->get_filter_for_module($cm->id, 'pchkorg_min_percent');
-        if (!$minpercent) {
+        if (null === $minpercent) {
             $minpercent = $this->configmodel->get_system_config('pchkorg_min_percent');
         }
-        if ($minpercent) {
-            $filters['source_min_percent'] = $minpercent;
-        }
+
+        // Sent unconditionally, 0 included. The service stores the last value
+        // it was told for an activity and has no other way to hear that a
+        // threshold changed, so leaving the field out would keep the previous
+        // one filtering every future submission.
+        $filters['source_min_percent'] = (int) $minpercent;
 
         $this->filtercache[$cm->id] = $filters;
 

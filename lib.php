@@ -45,10 +45,23 @@ use plagiarism_pchkorg\classes\permissions\capability;
 /**
  * Validate the minimum source similarity percentage.
  *
+ * An empty field is not the same as 0 and is equally valid. Empty means the
+ * activity defers to the site-wide threshold; 0 means this activity filters
+ * nothing, whatever the site-wide threshold says. The two are kept apart all
+ * the way to the service, so neither may be rejected here.
+ *
  * @param mixed $value
  * @return bool
  */
 function pchkorg_check_pchkorg_min_percent($value) {
+    if (null === $value || '' === trim((string) $value)) {
+        return true;
+    }
+
+    if (!is_numeric($value)) {
+        return false;
+    }
+
     return 0 <= $value && $value < 100;
 }
 
@@ -198,7 +211,11 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
             get_string('pchkorg_min_percent_range', 'plagiarism_pchkorg'),
             'check_pchkorg_min_percent'
         );
-        $mform->setType('pchkorg_min_percent', PARAM_INT);
+        // Not PARAM_INT: that cleans an empty field to 0, and here the two mean
+        // different things -- empty defers to the site-wide threshold, 0 turns
+        // filtering off for this activity. The value is validated by the rule
+        // above and cast to an int before it is stored.
+        $mform->setType('pchkorg_min_percent', PARAM_RAW_TRIMMED);
 
         $mform->addElement(
             'select',
@@ -270,6 +287,78 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
 }
 
 /**
+ * Persist the activity's source similarity threshold.
+ *
+ * Kept out of the loop that saves every other setting because this is the one
+ * with three states rather than two:
+ *
+ *  - a number, which this activity filters sources by;
+ *  - an empty field, meaning the activity defers to the site-wide threshold,
+ *    which is what the absence of a record means to the sender;
+ *  - 0, meaning this activity filters nothing at all, whatever the site-wide
+ *    threshold says.
+ *
+ * Storing 0 is what makes the third state expressible. Earlier versions
+ * deleted the record for it, leaving it indistinguishable from the second, so
+ * a teacher who cleared a threshold silently got the site-wide one back -- and
+ * with nothing left to send, the service went on applying the value it had
+ * last been told.
+ *
+ * @param object $data Submitted form data.
+ * @param array $records Existing config records for this course module.
+ * @param bool $canchange Whether the acting user may change the threshold.
+ * @return void
+ */
+function plagiarism_pchkorg_save_min_percent($data, $records, $canchange) {
+    global $DB;
+
+    // The field is rendered disabled for a user who may not change it, and a
+    // disabled field is not posted at all. Writing anything from that absence
+    // would let saving the activity for any other reason silently wipe a
+    // threshold this user was never shown.
+    if (!$canchange) {
+        return;
+    }
+
+    $field = 'pchkorg_min_percent';
+
+    $existing = null;
+    foreach ($records as $record) {
+        if ($record->name === $field) {
+            $existing = $record;
+            break;
+        }
+    }
+
+    $submitted = isset($data->{$field}) ? trim((string) $data->{$field}) : '';
+
+    // Empty, or anything the form rule would have rejected: defer to the site.
+    if ('' === $submitted || !is_numeric($submitted)) {
+        if (null !== $existing) {
+            $DB->delete_records('plagiarism_pchkorg_config', ['id' => $existing->id]);
+        }
+
+        return;
+    }
+
+    $value = (string) (int) $submitted;
+
+    if (null !== $existing) {
+        $existing->value = $value;
+        $DB->update_record('plagiarism_pchkorg_config', $existing);
+
+        return;
+    }
+
+    $insert = new \stdClass();
+    $insert->cm = $data->coursemodule;
+    $insert->name = $field;
+    $insert->value = $value;
+
+    $DB->insert_record('plagiarism_pchkorg_config', $insert);
+}
+
+/**
  * Persist the plugin's per-activity settings when a form is saved.
  *
  * @param object $data Submitted form data.
@@ -286,9 +375,10 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
         return $data;
     }
 
+    // The similarity threshold is not in this list: it is the one setting with
+    // three states rather than two, so it is saved separately below.
     $fields = [
         'pchkorg_module_use',
-        'pchkorg_min_percent',
         'pchkorg_include_citation',
         'pchkorg_include_referenced',
         'pchkorg_exclude_self_plagiarism',
@@ -302,7 +392,6 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
     ]);
 
     $context = context_module::instance($data->coursemodule);
-    $canchangeminpercent = has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context);
 
     foreach ($fields as $field) {
         $isfounded = false;
@@ -312,26 +401,12 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
                 if (!isset($data->{$record->name}) || $data->{$record->name} === null) {
                     $data->{$record->name} = 0;
                 }
-                if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
-                    $DB->delete_records('plagiarism_pchkorg_config', ['id' => $record->id]);
-                    break;
-                }
-                if ($field === 'pchkorg_min_percent' && 0 == $data->{$record->name}) {
-                    $DB->delete_records('plagiarism_pchkorg_config', ['id' => $record->id]);
-                    break;
-                }
                 $record->value = $data->{$record->name};
                 $DB->update_record('plagiarism_pchkorg_config', $record);
                 break;
             }
         }
         if (!$isfounded && isset($data->{$field})) {
-            if ($field === 'pchkorg_min_percent' && !$canchangeminpercent) {
-                continue;
-            }
-            if ($field === 'pchkorg_min_percent' && 0 == $data->{$field}) {
-                continue;
-            }
             $insert = new \stdClass();
             $insert->cm = $data->coursemodule;
             $insert->name = $field;
@@ -340,6 +415,12 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
             $DB->insert_record('plagiarism_pchkorg_config', $insert);
         }
     }
+
+    plagiarism_pchkorg_save_min_percent(
+        $data,
+        $records,
+        has_capability(capability::CHANGE_MIN_PERCENT_FILTER, $context)
+    );
 
     // The loop above wrote the activity's settings straight through $DB, which
     // the config model caches for the life of the request and cannot see. The
