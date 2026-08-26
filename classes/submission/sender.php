@@ -26,6 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/../assignment_key.php');
+require_once(__DIR__ . '/../site_version.php');
 require_once(__DIR__ . '/assign_resolver.php');
 require_once(__DIR__ . '/quiz_resolver.php');
 require_once(__DIR__ . '/forum_resolver.php');
@@ -173,6 +174,14 @@ class plagiarism_pchkorg_sender {
         $filters['assignment_key'] = plagiarism_pchkorg_assignment_key::for_cmid($cm->id);
         $filters['ignore_templates_enabled'] =
             '1' === $this->configmodel->get_system_config('pchkorg_enable_ignore_templates') ? '1' : '0';
+
+        // Which releases are still in the field, so support for old ones can be
+        // dropped on evidence. Both are site facts rather than search filters,
+        // and ride here only because this is what reaches both send paths. A
+        // site that cannot report a version sends null, which the body builders
+        // drop, and is checked exactly as before.
+        $filters['moodle_version'] = plagiarism_pchkorg_site_version::moodle_major();
+        $filters['plugin_version'] = plagiarism_pchkorg_site_version::plugin_release();
 
         // The per-activity threshold wins over the site-wide one. The test is
         // for a stored value rather than a truthy one: a stored 0 is a teacher

@@ -148,6 +148,13 @@ and [Terms and Conditions](https://plagiarismcheck.org/terms-of-service/) and
 ensure that their Moodle privacy disclosures and institutional policies are
 appropriate.
 
+Each submission also reports the site's major Moodle version and this plugin's
+release, so that PlagiarismCheck.org knows which versions are still in use and
+can retire support for old ones without stranding sites. Neither value
+identifies a person or a site. Everything the plugin sends is declared through
+the Moodle Privacy API and is visible at **Site administration ▸ Users ▸ Privacy
+and policies ▸ Plugin privacy registry**.
+
 ## Support
 
 - Product and account support: [support@plagiarismcheck.org](mailto:support@plagiarismcheck.org)

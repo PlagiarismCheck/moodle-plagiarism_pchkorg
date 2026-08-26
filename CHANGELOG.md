@@ -56,6 +56,20 @@ settings form, which Moodle itself gates on `moodle/course:manageactivities`. A
 role granted the new capability but not that one can download templates, but
 cannot open the form to change them.
 
+**Also: submissions now say which Moodle and which plugin version sent them.**
+The plugin supports Moodle 3.9 through 5.2, and until now nobody knew which of
+those versions institutions were actually running — so a decision to stop
+supporting an old one was a guess, and risked stranding sites. Each submission
+now carries the site's major Moodle version (`5.0`, `4.5`) and this plugin's
+release (`v3.16.4`) alongside it.
+
+Neither identifies a person or a site, neither is stored in Moodle, and neither
+changes how work is checked: a site that cannot report its version sends nothing
+and is checked exactly as before. Both are listed in the plugin's privacy
+summary, along with everything else it sends, so a data protection officer can
+see them at **Site administration ▸ Users ▸ Privacy and policies ▸ Plugin
+privacy registry**.
+
 ## v3.16.3 — 19 August 2026
 
 **Fixed: lowering or clearing "Exclude sources below X% similarity" had no

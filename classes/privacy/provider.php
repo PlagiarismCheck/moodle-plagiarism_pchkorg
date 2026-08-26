@@ -131,6 +131,10 @@ class provider implements
         // described in its string: hashed for membership and template calls,
         // and in full, with the user's name, when auto-registration creates an
         // account for them on the service.
+        //
+        // The two version fields describe the site rather than any person, and
+        // are listed because everything leaving Moodle is declared here, not
+        // because they carry personal data.
         $collection->add_external_location_link(
             'plagiarism_pchkorg',
             [
@@ -138,6 +142,8 @@ class provider implements
                         'email' => 'privacy:metadata:plagiarism_pchkorg:email',
                         'name' => 'privacy:metadata:plagiarism_pchkorg:name',
                         'assignment_key' => 'privacy:metadata:plagiarism_pchkorg:assignment_key',
+                        'moodle_version' => 'privacy:metadata:plagiarism_pchkorg:moodle_version',
+                        'plugin_version' => 'privacy:metadata:plagiarism_pchkorg:plugin_version',
                         'template_filename' => 'privacy:metadata:plagiarism_pchkorg:template_filename',
                         'template_content' => 'privacy:metadata:plagiarism_pchkorg:template_content',
                 ],

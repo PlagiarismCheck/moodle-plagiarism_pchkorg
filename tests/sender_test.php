@@ -326,6 +326,36 @@ class sender_test extends \advanced_testcase {
     }
 
     /**
+     * The site's Moodle and plugin releases travel with every submission, so
+     * the service can see which versions are still in use.
+     */
+    public function test_versions_are_sent(): void {
+        global $CFG;
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.');
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $body = $transport->request()['params'];
+
+        // Asserted against the running Moodle rather than a literal, so the
+        // test does not need editing on every Moodle upgrade.
+        $version = \plagiarism_pchkorg_site_version::moodle_major();
+        $this->assertStringContainsString('name="moodle_version"', $body);
+        $this->assertStringContainsString("\r\n\r\n" . $version . "\r\n", $body);
+
+        // Asserted with preg_match because assertMatchesRegularExpression needs
+        // PHPUnit 9, and Moodle 3.9 ships 7.
+        $this->assertSame(1, preg_match('/^\d+\.\d+$/', $version), "unexpected shape: {$version}");
+
+        $plugin = new \stdClass();
+        require($CFG->dirroot . '/plagiarism/pchkorg/version.php');
+        $this->assertStringContainsString('name="plugin_version"', $body);
+        $this->assertStringContainsString("\r\n\r\n" . $plugin->release . "\r\n", $body);
+    }
+
+    /**
      * Assert the multipart body carries the key for a course module.
      *
      * @param \plagiarism_pchkorg_fake_transport $transport

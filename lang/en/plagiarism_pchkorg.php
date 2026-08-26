@@ -250,6 +250,12 @@ $string['privacy:metadata:plagiarism_pchkorg:name'] =
     'The first and last name of the user, sent only when auto-registration creates an account for them on the service';
 $string['privacy:metadata:plagiarism_pchkorg:assignment_key'] =
     'An identifier for the Moodle activity, so submissions and ignored templates can be matched to it';
+$string['privacy:metadata:plagiarism_pchkorg:moodle_version'] =
+    'The major version of this Moodle site, such as 5.0, so the service knows which versions are still in use and which '
+    . 'it can stop supporting. It says nothing about any user.';
+$string['privacy:metadata:plagiarism_pchkorg:plugin_version'] =
+    'The release of this plugin, such as v3.16.4, sent for the same reason as the Moodle version. It says nothing about '
+    . 'any user.';
 $string['privacy:metadata:plagiarism_pchkorg:template_filename'] = 'The file name of an uploaded activity template';
 $string['privacy:metadata:plagiarism_pchkorg:template_content'] = 'The content of an uploaded or pasted activity template';
 
