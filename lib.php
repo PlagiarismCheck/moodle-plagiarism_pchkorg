@@ -361,6 +361,21 @@ function plagiarism_pchkorg_save_min_percent($data, $records, $canchange) {
 /**
  * Persist the plugin's per-activity settings when a form is saved.
  *
+ * The single place a saved activity form is applied, and deliberately so.
+ * plagiarism_plugin_pchkorg intentionally does not implement the older
+ * plagiarism_plugin::save_form_elements(): Moodle 3.9 to 4.1 call both that
+ * method and this callback for one save, and a plugin implementing both has
+ * every save applied twice. Most of the work below survives that, being writes
+ * of the posted value, but the parts that are instructions rather than settings
+ * do not. The second run re-posts the same ignored templates -- the draft area
+ * is still full, nothing having consumed it -- and PlagiarismCheck.org rejects
+ * them as duplicates of the ones the first run has just attached, so a
+ * successful upload is reported to the teacher as a failure.
+ *
+ * The base class carries an empty save_form_elements() on those versions, so
+ * their deprecated call reaches that and does nothing; 4.2 onwards dropped the
+ * call and the method with it. Either way this runs exactly once.
+ *
  * @param object $data Submitted form data.
  * @param object|null $course
  * @return object The unmodified form data.
@@ -878,16 +893,6 @@ display: inline-block;"
         }
 
         return '';
-    }
-
-    /**
-     * hook to save plagiarism specific settings on a module settings page
-     *
-     * @param object $data - data from an mform submission.
-     * @throws dml_exception
-     */
-    public function save_form_elements($data) {
-        return plagiarism_pchkorg_coursemodule_edit_post_actions($data, null);
     }
 
     /**

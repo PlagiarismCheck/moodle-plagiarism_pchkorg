@@ -2,6 +2,33 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.16.5 — 26 August 2026
+
+**Fixed: on Moodle 3.9 to 4.1, attaching an ignored template reported "That
+template is already attached to this activity".** It said so for the very first
+template of an activity, with nothing attached to duplicate — and the template
+was in fact attached, so reopening the settings showed it there under an error
+saying it had been refused.
+
+Those Moodle versions apply a saved activity form through two hooks, an older
+one Moodle 4.2 removed and the current one, and the plugin answered both. Every
+save therefore ran twice. Nothing that stores a posted setting minds being
+asked to store it again, which is why this never showed up anywhere else, but
+the uploaded templates are not a setting: the second run posted the same file a
+second time and PlagiarismCheck.org quite correctly refused it as a duplicate
+of the one the first run had just attached. The plugin now answers only the
+current hook, as Moodle has asked plugins to since 3.9, so a save is applied
+once on every supported version.
+
+Pasted template text was refused the same way. An activity already holding five
+templates could also refuse a legitimate save as exceeding the limit, counting
+the same upload twice against it. Moodle 4.2 and later, which is where this was
+developed, were never affected.
+
+*Expect this:* a template that was attached under an error message needs no
+cleanup. It is attached, it is listed, and the submissions in the activity were
+queued to be checked against it as they should have been.
+
 ## v3.16.4 — 26 August 2026
 
 **Fixed: changing an activity's ignored templates left its existing reports
