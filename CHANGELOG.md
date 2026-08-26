@@ -2,6 +2,60 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.16.4 — 26 August 2026
+
+**Fixed: changing an activity's ignored templates left its existing reports
+alone.** Templates were only ever applied at the moment a submission was
+checked, so attaching a rubric to an activity that had already been marked did
+nothing for the work already in it: those reports went on counting the shared
+wording against students, and the only way out was to have every student submit
+again.
+
+Adding or deleting a template now also re-checks the submissions already in the
+activity. Their finished checks are queued and their similarity and AI scores
+recalculated under the templates as they now stand, over the next few runs of
+the scheduled task; until then those submissions show as waiting for a result
+instead of showing their previous score. No document is uploaded a second time
+and none of the institution's allowance is used.
+
+A save that changed no templates queues nothing, so saving an activity for some
+unrelated reason does not disturb its reports. A save PlagiarismCheck.org
+refused queues nothing either: the templates did not change, so the stored
+reports still match the ones in force. Ticking **Fetch updated results** on the
+same save as a template change is reported once rather than twice.
+
+This needs the matching service-side fix to be deployed. Without it a re-check
+of unchanged text can be answered from the earlier report, and the newly added
+template is silently not applied.
+
+**New: a capability of its own for managing ignored templates.** Adding,
+deleting and downloading an activity's templates was gated on Moodle's
+`moodle/course:manageactivities`, which stock Moodle grants only to editing
+teachers and managers, and which no site can adjust for templates alone without
+also changing who may edit activities. There is now
+`plagiarism/pchkorg:manageignoretemplates`, allowed by default to **editing
+teachers, managers and course creators**. A site can grant it to any other role,
+or withhold it from a role that still edits activities in every other respect.
+
+Deliberately not granted to the non-editing teacher role: a template decides
+what stops counting against every student in the activity, which is a change to
+how the work is marked rather than part of marking it. Sites that want it there
+can grant it.
+
+On upgrade the capability is also granted to the custom teaching roles this
+plugin already recognises by name — `ta`, `hod`, `cl`, `cce`, `lib`, `led`,
+`id`, `ca`, `l`, `adt1`, `adt1tii` — so an assistant who could manage templates
+before this release still can. Roles built on no stock archetype are invisible
+to Moodle's capability defaults, which is why they are named explicitly. A role
+that already had an answer recorded for this capability keeps it, including a
+deliberate refusal, and a custom role created *after* this upgrade needs the
+capability granted in the usual way.
+
+*Expect this:* the templates section is still reached through the activity
+settings form, which Moodle itself gates on `moodle/course:manageactivities`. A
+role granted the new capability but not that one can download templates, but
+cannot open the form to change them.
+
 ## v3.16.3 — 19 August 2026
 
 **Fixed: lowering or clearing "Exclude sources below X% similarity" had no
@@ -156,5 +210,9 @@ that serves them.
 - Ignored activity templates are **off by default** on upgrade, and stay hidden
   until an administrator enables the setting and the site is on an institutional
   token.
+- `v3.16.4` adds the `plagiarism/pchkorg:manageignoretemplates` capability. Its
+  upgrade step assigns it to existing custom teaching roles by shortname and
+  changes no data; it is safe to re-run and does not override a permission a
+  site has already set.
 - If the backend does not yet expose the ignore-template endpoints, deploy this
   plugin anyway: with the setting off it behaves exactly as before.

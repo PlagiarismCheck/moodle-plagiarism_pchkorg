@@ -48,4 +48,13 @@ class capability {
      * CHANGE_MIN_PERCENT_FILTER
      */
     const CHANGE_MIN_PERCENT_FILTER = 'plagiarism/pchkorg:changeminpercentfilter';
+    /**
+     * MANAGE_IGNORE_TEMPLATES
+     *
+     * Attaching, deleting and downloading the template material an activity's
+     * submissions are checked against. Its own capability rather than
+     * moodle/course:manageactivities, so a site can hand templates to a role
+     * that does not edit activities, or withhold them from one that does.
+     */
+    const MANAGE_IGNORE_TEMPLATES = 'plagiarism/pchkorg:manageignoretemplates';
 }

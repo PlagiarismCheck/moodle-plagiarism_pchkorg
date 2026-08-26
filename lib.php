@@ -432,16 +432,29 @@ function plagiarism_pchkorg_coursemodule_edit_post_actions($data, $course) {
     // Ignored assignment templates. A failure here must not abort saving the
     // activity, so it is reported as a notification and the rest of the
     // settings are kept.
-    $templateerror = plagiarism_pchkorg_ignore_template_form::save($data, $pchkorgconfigmodel);
-    if (null !== $templateerror) {
-        \core\notification::error(plagiarism_pchkorg_ignore_template_form::error_message($templateerror));
+    $templateresult = plagiarism_pchkorg_ignore_template_form::save($data, $pchkorgconfigmodel);
+    if (null !== $templateresult->error) {
+        \core\notification::error(plagiarism_pchkorg_ignore_template_form::error_message($templateresult->error));
     }
 
     // Refreshing results. Reported as a notification because saving the form
     // redirects away from it, leaving nowhere to show the outcome in place.
+    //
+    // A template change has already queued this activity's finished checks, so
+    // a box ticked on the same save finds nothing of its own left to queue. The
+    // two counts are added and reported once, rather than following "12
+    // submissions queued" with "there was nothing to refresh". When the box was
+    // not ticked the queueing needs explaining, so it is reported in terms of
+    // the template change that caused it.
     if (!empty($data->{plagiarism_pchkorg_refresh_results_form::FIELD})) {
         $refreshed = plagiarism_pchkorg_refresh_results_form::save($data, $pchkorgconfigmodel);
-        \core\notification::success(plagiarism_pchkorg_refresh_results::result_message($refreshed));
+        \core\notification::success(
+            plagiarism_pchkorg_refresh_results::result_message($refreshed + $templateresult->requeued)
+        );
+    } else if ($templateresult->requeued > 0) {
+        \core\notification::success(
+            plagiarism_pchkorg_ignore_template_form::requeue_message($templateresult->requeued)
+        );
     }
 
     return $data;

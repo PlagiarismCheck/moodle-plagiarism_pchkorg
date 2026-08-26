@@ -185,6 +185,83 @@ class ignore_template_form_test extends \advanced_testcase {
     }
 
     /**
+     * Exactly the extensions the service parses are offered: anything else is
+     * refused on upload, and anything missing cannot be attached at all.
+     */
+    public function test_accepted_types_match_the_service(): void {
+        $types = \plagiarism_pchkorg_ignore_template_filemanager::accepted_types();
+
+        sort($types);
+        $this->assertSame(
+            ['.doc', '.docx', '.odp', '.odt', '.pdf', '.ppt', '.pptx', '.rtf', '.txt'],
+            $types
+        );
+    }
+
+    /**
+     * The upload element carries a size cap rather than core's "Unlimited",
+     * and never a cap above what the service accepts.
+     */
+    public function test_upload_element_caps_the_file_size(): void {
+        $mform = $this->mform();
+
+        \plagiarism_pchkorg_ignore_template_form::add_elements(
+            $mform,
+            null,
+            $this->configmodel(),
+            $this->provider()
+        );
+
+        $maxbytes = $mform->getElement(\plagiarism_pchkorg_ignore_template_form::FIELD_FILES)->getMaxbytes();
+
+        // Core lowers the cap further to the site and PHP limits, so this is
+        // an upper bound, not an equality. What matters is that it is neither
+        // unlimited (-1) nor larger than the service allows.
+        $this->assertGreaterThan(0, $maxbytes);
+        $this->assertLessThanOrEqual(
+            \plagiarism_pchkorg_ignore_template_filemanager::MAX_FILESIZE_BYTES,
+            $maxbytes
+        );
+    }
+
+    /**
+     * An administrator may ignore Moodle's file size limits, so core prints
+     * "Maximum file size: Unlimited" however the element is configured. The
+     * service's limit applies to them all the same, and the rendered element
+     * says so.
+     */
+    public function test_rendered_element_states_the_limit_to_an_administrator(): void {
+        $this->setAdminUser();
+
+        $html = $this->rendered_upload_element();
+
+        $this->assertStringContainsString(
+            \plagiarism_pchkorg_ignore_template_filemanager::max_filesize_label(),
+            $html
+        );
+        $this->assertStringNotContainsString(get_string('unlimited'), $html);
+    }
+
+    /**
+     * A site limit below the service's is stricter, and is what the teacher is
+     * actually held to, so core's own figure is left in place. Overwriting it
+     * with the service's larger one would invite an upload the site refuses.
+     */
+    public function test_rendered_element_keeps_a_stricter_site_limit(): void {
+        global $CFG;
+
+        $CFG->maxbytes = 1048576;
+
+        $html = $this->rendered_upload_element();
+
+        $this->assertStringContainsString(display_size(1048576, 0), $html);
+        $this->assertStringNotContainsString(
+            \plagiarism_pchkorg_ignore_template_filemanager::max_filesize_label(),
+            $html
+        );
+    }
+
+    /**
      * Editing lists what is attached, each row with a delete box.
      */
     public function test_edit_form_lists_existing_templates(): void {
@@ -224,7 +301,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $this->assertSame(0, $transport->request_count());
     }
 
@@ -243,7 +320,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $this->assertSame(0, $transport->request_count());
     }
 
@@ -263,7 +340,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $this->assertSame(0, $transport->request_count());
     }
 
@@ -283,8 +360,57 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertSame('files_and_text_conflict', $result);
+        $this->assertSame('files_and_text_conflict', $result->error);
         $this->assertSame(0, $transport->request_count());
+    }
+
+    /**
+     * A file over the service's limit is refused here, without being posted.
+     *
+     * The upload element caps the size, but core lifts that cap for anyone
+     * holding moodle/course:ignorefilesizelimits, so an oversized file can
+     * still arrive in the draft area.
+     */
+    public function test_save_refuses_a_file_over_the_size_limit(): void {
+        $transport = new \plagiarism_pchkorg_fake_transport();
+        $draftid = $this->draft_area_with_file(
+            'huge.txt',
+            str_repeat('a', \plagiarism_pchkorg_ignore_template_filemanager::MAX_FILESIZE_BYTES + 1)
+        );
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([
+                \plagiarism_pchkorg_ignore_template_form::FIELD_FILES => $draftid,
+            ]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertSame('file_too_large', $result->error);
+        $this->assertSame(0, $transport->request_count());
+    }
+
+    /**
+     * A file exactly on the limit is accepted: the service refuses what is
+     * larger than the limit, not what equals it.
+     */
+    public function test_save_accepts_a_file_on_the_size_limit(): void {
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success()]);
+        $draftid = $this->draft_area_with_file(
+            'exact.txt',
+            str_repeat('a', \plagiarism_pchkorg_ignore_template_filemanager::MAX_FILESIZE_BYTES)
+        );
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([
+                \plagiarism_pchkorg_ignore_template_form::FIELD_FILES => $draftid,
+            ]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertNull($result->error);
+        $this->assertSame(1, $transport->request_count());
     }
 
     /**
@@ -301,7 +427,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $body = $transport->request()['params'];
         $this->assertStringContainsString('name="template_text"', $body);
         $this->assertStringContainsString('The wording students repeat.', $body);
@@ -327,7 +453,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $body = $transport->request()['params'];
         $this->assertStringContainsString('name="templates[0]"', $body);
         $this->assertStringContainsString('rubric.txt', $body);
@@ -354,7 +480,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $body = $transport->request()['params'];
         $this->assertStringContainsString('name="delete[0]"', $body);
         $this->assertStringContainsString('name="delete[1]"', $body);
@@ -379,7 +505,7 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertNull($result);
+        $this->assertNull($result->error);
         $this->assertSame(0, $transport->request_count(), 'nothing identifiable was ticked');
     }
 
@@ -399,7 +525,152 @@ class ignore_template_form_test extends \advanced_testcase {
             $this->provider($transport)
         );
 
-        $this->assertSame('template_limit_exceeded', $result);
+        $this->assertSame('template_limit_exceeded', $result->error);
+    }
+
+    /**
+     * Attaching a template queues this activity's finished checks, so their
+     * scores are read again under the templates as they now stand.
+     */
+    public function test_save_queues_finished_checks_under_the_new_templates(): void {
+        $checked = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_CHECKED);
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success()]);
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([
+                \plagiarism_pchkorg_ignore_template_form::FIELD_TEXT => 'The wording students repeat.',
+            ]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertNull($result->error);
+        $this->assertSame(1, $result->requeued);
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_SENT, $this->state_of($checked));
+    }
+
+    /**
+     * Deleting a template queues them too: a report taken while the template
+     * applied is as wrong as one taken before it existed.
+     */
+    public function test_save_queues_finished_checks_when_a_template_is_deleted(): void {
+        $checked = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_CHECKED);
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success()]);
+        $prefix = \plagiarism_pchkorg_ignore_template_form::FIELD_DELETE;
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([$prefix . '7' => 1]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertNull($result->error);
+        $this->assertSame(1, $result->requeued);
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_SENT, $this->state_of($checked));
+    }
+
+    /**
+     * A save that left the templates alone queues nothing. Every activity save
+     * reaches this code, and most of them have nothing to do with templates.
+     */
+    public function test_a_save_that_touched_no_template_queues_nothing(): void {
+        $checked = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_CHECKED);
+        $transport = new \plagiarism_pchkorg_fake_transport();
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertSame(0, $result->requeued);
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_CHECKED, $this->state_of($checked));
+    }
+
+    /**
+     * A save the service refused changed no templates, so the stored reports
+     * still match the ones in force and must be left on screen.
+     */
+    public function test_a_refused_save_queues_nothing(): void {
+        $checked = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_CHECKED);
+        $transport = new \plagiarism_pchkorg_fake_transport([
+            json_encode(['success' => false, 'code' => 'template_limit_exceeded']),
+        ]);
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([
+                \plagiarism_pchkorg_ignore_template_form::FIELD_TEXT => 'Some wording.',
+            ]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertSame('template_limit_exceeded', $result->error);
+        $this->assertSame(0, $result->requeued);
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_CHECKED, $this->state_of($checked));
+    }
+
+    /**
+     * Only finished checks are queued. A submission still working its way
+     * towards a result would be dragged backwards by a move to LOCAL_SENT, and
+     * one that failed has no report to bring into line.
+     */
+    public function test_unfinished_submissions_are_left_where_they_are(): void {
+        $queued = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_QUEUED);
+        $failed = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_ERROR);
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success()]);
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([
+                \plagiarism_pchkorg_ignore_template_form::FIELD_TEXT => 'The wording students repeat.',
+            ]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertSame(0, $result->requeued);
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_QUEUED, $this->state_of($queued));
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_ERROR, $this->state_of($failed));
+    }
+
+    /**
+     * Templates belong to one activity, and so does the queueing they cause.
+     */
+    public function test_another_activity_is_not_queued(): void {
+        $other = $this->getDataGenerator()->create_module('assign', ['course' => $this->course->id]);
+        $othercm = get_coursemodule_from_instance('assign', $other->id);
+
+        $mine = $this->submission_record(\plagiarism_pchkorg_state::LOCAL_CHECKED);
+        $theirs = $this->submission_record(
+            \plagiarism_pchkorg_state::LOCAL_CHECKED,
+            ['cm' => $othercm->id]
+        );
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success()]);
+
+        $result = \plagiarism_pchkorg_ignore_template_form::save(
+            $this->submission([
+                \plagiarism_pchkorg_ignore_template_form::FIELD_TEXT => 'The wording students repeat.',
+            ]),
+            $this->configmodel(),
+            $this->provider($transport)
+        );
+
+        $this->assertSame(1, $result->requeued);
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_SENT, $this->state_of($mine));
+        $this->assertSame(\plagiarism_pchkorg_state::LOCAL_CHECKED, $this->state_of($theirs));
+    }
+
+    /**
+     * The message names the template change that caused the queueing, and reads
+     * for a single submission as well as for several.
+     */
+    public function test_the_requeue_message_names_its_cause_and_counts(): void {
+        $one = \plagiarism_pchkorg_ignore_template_form::requeue_message(1);
+        $many = \plagiarism_pchkorg_ignore_template_form::requeue_message(12);
+
+        $this->assertStringContainsString('Templates updated', $one);
+        $this->assertStringContainsString('1 submission ', $one);
+        $this->assertStringContainsString('12 submissions', $many);
     }
 
     /**
@@ -416,6 +687,44 @@ class ignore_template_form_test extends \advanced_testcase {
         }
 
         return $data;
+    }
+
+    /**
+     * A row in the plugin's own submission table, as a check leaves behind.
+     *
+     * @param int $state One of the plagiarism_pchkorg_state LOCAL_ constants.
+     * @param array $fields Overrides for the defaults.
+     * @return int Id of the new record.
+     */
+    private function submission_record($state, array $fields = []) {
+        global $DB;
+
+        $record = (object) array_merge([
+            'cm' => $this->cm->id,
+            'userid' => $this->teacher->id,
+            'fileid' => null,
+            'itemid' => 1,
+            'signature' => sha1('content' . uniqid('', true)),
+            'textid' => 9999,
+            'state' => $state,
+            'score' => 0,
+            'attempt' => 0,
+            'created_at' => time(),
+        ], $fields);
+
+        return $DB->insert_record('plagiarism_pchkorg_files', $record);
+    }
+
+    /**
+     * The stored state of a submission row.
+     *
+     * @param int $id
+     * @return int
+     */
+    private function state_of($id) {
+        global $DB;
+
+        return (int) $DB->get_field('plagiarism_pchkorg_files', 'state', ['id' => $id]);
     }
 
     /**
@@ -467,6 +776,32 @@ class ignore_template_form_test extends \advanced_testcase {
      */
     private function configmodel() {
         return new \plagiarism_pchkorg_config_model();
+    }
+
+    /**
+     * The upload element as it reaches a teacher's browser.
+     *
+     * @return string HTML.
+     */
+    private function rendered_upload_element() {
+        global $PAGE;
+
+        $PAGE->set_url('/course/modedit.php');
+        $PAGE->set_context(\context_module::instance($this->cm->id));
+
+        $mform = $this->mform();
+        \plagiarism_pchkorg_ignore_template_form::add_elements(
+            $mform,
+            null,
+            $this->configmodel(),
+            $this->provider()
+        );
+
+        $element = $mform->getElement(\plagiarism_pchkorg_ignore_template_form::FIELD_FILES);
+        // A rendered form assigns this; nothing here has rendered one.
+        $element->updateAttributes(['id' => 'id_' . $element->getName()]);
+
+        return $element->toHtml();
     }
 
     /**

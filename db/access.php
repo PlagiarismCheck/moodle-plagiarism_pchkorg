@@ -59,4 +59,20 @@ $capabilities = [
             'coursecreator'  => CAP_ALLOW,
         ],
     ],
+    // Deliberately not granted to the non-editing teacher archetype. A template
+    // decides what stops counting against every student in the activity, which
+    // is a change to how the work is marked rather than part of marking it.
+    //
+    // Roles built from no stock archetype are unreachable from here; the
+    // upgrade step for 2026082601 grants this to the custom teaching roles in
+    // plagiarism_pchkorg_roles by name.
+    'plagiarism/pchkorg:manageignoretemplates' => [
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => [
+            'editingteacher' => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+            'coursecreator'  => CAP_ALLOW,
+        ],
+    ],
 ];

@@ -112,6 +112,7 @@ $string['pchkorg_auto_registration_unavailable'] =
 $string['pchkorg:enable'] = 'Allow to enable/disable PlagiarismCheck.org inside an activity';
 $string['pchkorg:viewsimilarity'] = 'Allow to view similarity value from PlagiarismCheck.org';
 $string['pchkorg:changeminpercentfilter'] = 'Allow changing "Exclude sources below X% similarity"';
+$string['pchkorg:manageignoretemplates'] = 'Allow adding, deleting and downloading activity templates to ignore';
 $string['pchkorg:enabledbydefault'] = 'Enable PlagiarismCheck in Activities by default';
 
 // Activity ignore templates.
@@ -120,16 +121,20 @@ $string['pchkorg_enable_ignore_templates_help'] =
     'When enabled, teachers can attach template files or text to an activity. Text in a student submission that '
     . 'matches a template is excluded from the similarity and AI scores, so task descriptions, questions, rubrics '
     . 'and coversheets do not count against students. Templates are stored by PlagiarismCheck.org and require an '
-    . 'institutional (group) API token. Changing templates affects submissions checked from then on; reports that '
-    . 'already exist keep their current scores.';
+    . 'institutional (group) API token. Changing an activity\'s templates also re-checks the submissions already in '
+    . 'it, so their existing reports are brought into line with the new templates rather than left as they were.';
 $string['pchkorg_ignore_templates'] = 'Ignored activity templates';
 $string['pchkorg_ignore_templates_help'] =
     'Text matching these templates is excluded from the similarity and AI scores of every submission to this '
     . 'activity, so shared wording such as the task description, a rubric or a coversheet does not count against '
     . 'students.'
     . "\n\n"
-    . 'Attach the template either as a file or as pasted text — one or the other in a single save, not both. '
-    . 'Changes apply to submissions checked from then on; reports that already exist keep their current scores.';
+    . 'Attach the template either as a file or as pasted text — one or the other in a single save, not both.'
+    . "\n\n"
+    . 'Adding or deleting a template also applies to the submissions already in this activity. They are checked '
+    . 'again under the templates as they now stand, and their scores are updated over the next few runs of the '
+    . 'scheduled task; until then those submissions show as waiting for a result instead of showing their previous '
+    . 'score. No document is uploaded a second time and none of your allowance is used.';
 $string['pchkorg_ignore_template_intro'] =
     'Attach the wording every student is expected to repeat — the task description, a rubric, a coversheet or a '
     . 'question sheet. Matching text is then excluded from the similarity and AI scores of this activity.';
@@ -145,7 +150,7 @@ $string['pchkorg_ignore_template_add_files_help'] =
     . 'accepted file types are listed under the upload box.'
     . "\n\n"
     . 'Upload files or paste text below, but not both in the same save.';
-$string['pchkorg_ignore_template_types'] = 'Accepted file types';
+$string['pchkorg_ignore_template_types'] = 'Files with the following extensions are accepted';
 $string['pchkorg_ignore_template_types_documents'] = 'Text documents';
 $string['pchkorg_ignore_template_types_pdf'] = 'PDF';
 $string['pchkorg_ignore_template_types_presentations'] = 'Presentations';
@@ -164,10 +169,21 @@ $string['pchkorg_ignore_template_filesize'] = 'Size';
 $string['pchkorg_ignore_template_download'] = 'Download';
 $string['pchkorg_ignore_template_delete'] = 'Delete';
 $string['pchkorg_ignore_template_delete_named'] = 'Delete {$a}';
-$string['pchkorg_ignore_template_delete_confirm'] = 'Delete this template? Its exclusions stop applying to future checks.';
+$string['pchkorg_ignore_template_delete_confirm'] =
+    'Delete this template? Submissions already checked against it are checked again without it.';
 $string['pchkorg_ignore_template_unavailable'] =
     'The template list could not be loaded from PlagiarismCheck.org. Your existing templates are unchanged.';
 $string['pchkorg_ignore_template_saved'] = 'Activity templates updated.';
+// Shown after a template change queued this activity's finished checks. Kept
+// apart from the pchkorg_refresh_results_queued wording, which answers a
+// teacher who asked for a refresh: here nobody asked, so the message has to
+// name the template change that caused it.
+$string['pchkorg_ignore_template_requeued'] =
+    'Templates updated. {$a} submissions in this activity are being checked again under the new templates. Their '
+    . 'scores will be updated over the next few runs of the scheduled task.';
+$string['pchkorg_ignore_template_requeued_one'] =
+    'Templates updated. 1 submission in this activity is being checked again under the new templates. Its score '
+    . 'will be updated over the next few runs of the scheduled task.';
 
 // Errors reported by the service, keyed by its error codes. The part after
 // pchkorg_ignore_template_error_ is the code the service sends, so these keys
@@ -179,7 +195,7 @@ $string['pchkorg_ignore_template_error_unsupported_extension'] =
 $string['pchkorg_ignore_template_error_invalid_mime_type'] =
     'That file is not a supported document. Upload a text document (.doc, .docx, .odt, .rtf, .txt), a PDF (.pdf) '
     . 'or a presentation (.ppt, .pptx, .odp).';
-$string['pchkorg_ignore_template_error_file_too_large'] = 'That file is too large.';
+$string['pchkorg_ignore_template_error_file_too_large'] = 'That file is too large. A template may be at most {$a}.';
 $string['pchkorg_ignore_template_error_insufficient_extracted_text'] = 'A template must contain at least 20 words.';
 $string['pchkorg_ignore_template_error_duplicate_template'] = 'That template is already attached to this activity.';
 $string['pchkorg_ignore_template_error_files_and_text_conflict'] = 'Upload files or paste text, but not both in one save.';

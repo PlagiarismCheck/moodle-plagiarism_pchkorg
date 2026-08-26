@@ -105,13 +105,26 @@ uploaded files or as pasted text, while creating it or later in its settings.
 
 Text in a student submission that matches a template is forced to count as
 original and as not AI generated, so wording every student is expected to repeat
-does not raise their scores. The submission itself is never altered. Templates
-apply to submissions checked from then on; reports that already exist keep their
-current scores.
+does not raise their scores. The submission itself is never altered.
 
-Supported uploaded files are Microsoft Word (`.doc`, `.docx`), Microsoft
-PowerPoint (`.pptx`), Rich Text Format (`.rtf`), OpenDocument Text (`.odt`),
-plain text (`.txt`), and PDF (`.pdf`), up to 20 MB per file.
+Adding or deleting a template also applies to the submissions already in the
+activity. Their finished checks are queued and their scores recalculated under
+the templates as they now stand, over the next few runs of the scheduled task;
+until then those submissions show as waiting for a result. No document is
+uploaded a second time and none of the institution's allowance is used.
+
+Managing templates requires the `plagiarism/pchkorg:manageignoretemplates`
+capability, which by default is held by editing teachers, managers and course
+creators, plus the custom teaching roles this plugin recognises. Administrators
+can grant it to any other role, or withhold it from a role that otherwise edits
+activities. Note that the section itself lives in the activity settings form,
+which Moodle gates on `moodle/course:manageactivities`, so a role needs both to
+change templates through the form.
+
+Supported uploaded files are Microsoft Word (`.doc`, `.docx`), Rich Text Format
+(`.rtf`), OpenDocument Text (`.odt`), plain text (`.txt`), PDF (`.pdf`),
+Microsoft PowerPoint (`.ppt`, `.pptx`) and OpenDocument Presentation (`.odp`),
+up to 25 MB per file.
 
 For illustrated instructions, see the official
 [administrator's guide](https://plagiarismcheck.org/blog/how-to-set-up-an-integration-in-moodle/)

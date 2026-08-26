@@ -25,6 +25,11 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/../classes/permissions/capability.class.php');
+require_once(__DIR__ . '/../classes/roles.php');
+
+use plagiarism_pchkorg\classes\permissions\capability;
+
 /**
 
  * Apply database upgrades for this plugin.
@@ -127,6 +132,29 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         }
 
         upgrade_plugin_savepoint(true, 2025022717, 'plagiarism', 'pchkorg');
+    }
+
+    if ($oldversion < 2026082601) {
+        // Managing ignored templates moved from moodle/course:manageactivities
+        // to a capability of this plugin's own. The archetype defaults in
+        // db/access.php carry the stock roles across, but a site's custom
+        // teaching roles may be built on any archetype or none, so nothing
+        // there reaches them. Grant it to the ones this plugin already knows
+        // by name, so a TA who could manage templates yesterday still can.
+        //
+        // Runs before the capability itself is registered: Moodle reads
+        // db/access.php in upgrade_component_updated(), after this function
+        // returns. That is fine. assign_capability() writes a role_capabilities
+        // row without consulting the capabilities table, and the cleanup that
+        // follows only drops capabilities missing from db/access.php, which
+        // this one is not.
+        //
+        // Only existing roles are touched, and only this capability. A site
+        // that wants a different answer overrides it in the usual place;
+        // nothing here runs a second time to undo that.
+        plagiarism_pchkorg_roles::grant_to_custom_teachers(capability::MANAGE_IGNORE_TEMPLATES);
+
+        upgrade_plugin_savepoint(true, 2026082601, 'plagiarism', 'pchkorg');
     }
 
     return true;

@@ -27,8 +27,12 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/assignment_key.php');
 require_once(__DIR__ . '/ignore_template_filemanager.php');
+require_once(__DIR__ . '/permissions/capability.class.php');
 require_once(__DIR__ . '/plagiarism_pchkorg_api_provider.php');
 require_once(__DIR__ . '/plagiarism_pchkorg_config_model.php');
+require_once(__DIR__ . '/refresh_results.php');
+
+use plagiarism_pchkorg\classes\permissions\capability;
 
 /**
  * Builds and saves the ignored-templates part of an activity settings form.
@@ -76,7 +80,7 @@ class plagiarism_pchkorg_ignore_template_form {
             return false;
         }
 
-        return has_capability('moodle/course:manageactivities', $context);
+        return has_capability(capability::MANAGE_IGNORE_TEMPLATES, $context);
     }
 
     /**
@@ -358,31 +362,37 @@ class plagiarism_pchkorg_ignore_template_form {
      * @param object $data Submitted form data; must carry coursemodule.
      * @param plagiarism_pchkorg_config_model $configmodel
      * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests.
-     * @return string|null Error code to show, or null on success or no-op.
+     * @return stdClass ->error holds the error code to show, or null on success
+     *                  or no-op; ->requeued holds how many of this activity's
+     *                  finished checks were queued to be read again.
      */
     public static function save($data, $configmodel, $apiprovider = null) {
         global $USER;
 
         if (empty($data->coursemodule)) {
-            return null;
+            return self::result(null);
         }
         if ('1' !== $configmodel->get_system_config('pchkorg_enable_ignore_templates')) {
-            return null;
+            return self::result(null);
         }
 
         $deleteids = self::submitted_delete_ids($data);
         $text = isset($data->{self::FIELD_TEXT}) ? trim((string) $data->{self::FIELD_TEXT}) : '';
         $files = [];
         if (!empty($data->{self::FIELD_FILES})) {
-            $files = self::draft_files((int) $data->{self::FIELD_FILES});
+            $draftitemid = (int) $data->{self::FIELD_FILES};
+            if (self::has_oversized_file($draftitemid)) {
+                return self::result('file_too_large');
+            }
+            $files = self::draft_files($draftitemid);
         }
 
         if ([] === $files && '' === $text && [] === $deleteids) {
-            return null;
+            return self::result(null);
         }
 
         if ([] !== $files && '' !== $text) {
-            return 'files_and_text_conflict';
+            return self::result('files_and_text_conflict');
         }
 
         if (null === $apiprovider) {
@@ -399,10 +409,59 @@ class plagiarism_pchkorg_ignore_template_form {
         if (!$saved) {
             $error = $apiprovider->get_last_error();
 
-            return empty($error) ? 'template_processing_failed' : $error;
+            return self::result(empty($error) ? 'template_processing_failed' : $error);
         }
 
-        return null;
+        // The set of templates that applies to this activity has just changed,
+        // so every report already stored against it was produced under the old
+        // set and no longer says what it should. The service re-checks its own
+        // copies when it accepts this call; queueing the local records is what
+        // makes Moodle ask for the revised scores, instead of leaving the ones
+        // taken under the previous templates on screen for good.
+        //
+        // Deliberately not gated on plagiarism_pchkorg_refresh_results::
+        // is_available(). That guards a teacher's explicit "refresh now"
+        // instruction and asks for the capability behind it; this is a
+        // consequence of a change they have already been allowed to make, to
+        // the records of the very activity they made it on.
+        return self::result(null, plagiarism_pchkorg_refresh_results::refresh($data->coursemodule));
+    }
+
+    /**
+     * The outcome of a save, in the shape the caller expects.
+     *
+     * @param string|null $error Error code to show, or null.
+     * @param int $requeued Finished checks queued to be read again.
+     * @return stdClass
+     */
+    private static function result($error, $requeued = 0) {
+        $result = new stdClass();
+        $result->error = $error;
+        $result->requeued = (int) $requeued;
+
+        return $result;
+    }
+
+    /**
+     * What to tell the teacher when a template change queued their submissions.
+     *
+     * Separate from plagiarism_pchkorg_refresh_results::result_message(), which
+     * answers a teacher who asked for a refresh and can say so plainly. Here
+     * they asked to change templates and the queueing is a consequence, so the
+     * message has to name the cause or it reads as though the form did
+     * something of its own accord.
+     *
+     * @param int $count Number of submissions queued. Callers only report a
+     *                   positive count; there is nothing to say about zero.
+     * @return string
+     */
+    public static function requeue_message($count) {
+        $count = (int) $count;
+        $key = 1 === $count
+            ? 'pchkorg_ignore_template_requeued_one'
+            : 'pchkorg_ignore_template_requeued';
+
+        return get_string($key, 'plagiarism_pchkorg', $count);
     }
 
     /**
@@ -427,6 +486,35 @@ class plagiarism_pchkorg_ignore_template_form {
         }
 
         return $ids;
+    }
+
+    /**
+     * Whether the draft area holds a file the service would refuse on size.
+     *
+     * The upload element caps files at MAX_FILESIZE_BYTES, but core lifts that
+     * cap for anyone holding moodle/course:ignorefilesizelimits — an
+     * administrator, typically — so a file well over the limit can still reach
+     * this point. Checked on the stored metadata, before draft_files() reads
+     * the contents, so an oversized file is never pulled into memory and never
+     * posted only to be rejected.
+     *
+     * @param int $draftitemid
+     * @return bool
+     */
+    private static function has_oversized_file($draftitemid) {
+        global $USER;
+
+        $usercontext = context_user::instance($USER->id);
+        $fs = get_file_storage();
+        $limit = plagiarism_pchkorg_ignore_template_filemanager::MAX_FILESIZE_BYTES;
+
+        foreach ($fs->get_area_files($usercontext->id, 'user', 'draft', $draftitemid, 'filename', false) as $file) {
+            if ($file->get_filesize() > $limit) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -482,6 +570,7 @@ class plagiarism_pchkorg_ignore_template_form {
         return [
             'subdirs' => 0,
             'maxfiles' => self::MAX_COUNT,
+            'maxbytes' => plagiarism_pchkorg_ignore_template_filemanager::MAX_FILESIZE_BYTES,
             'accepted_types' => plagiarism_pchkorg_ignore_template_filemanager::accepted_types(),
         ];
     }
@@ -502,6 +591,9 @@ class plagiarism_pchkorg_ignore_template_form {
         $a = null;
         if ('template_limit_exceeded' === $code) {
             $a = self::MAX_COUNT;
+        }
+        if ('file_too_large' === $code) {
+            $a = plagiarism_pchkorg_ignore_template_filemanager::max_filesize_label();
         }
 
         return get_string($key, 'plagiarism_pchkorg', $a);

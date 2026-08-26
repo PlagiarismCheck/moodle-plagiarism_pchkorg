@@ -41,10 +41,10 @@ class plagiarism_pchkorg_ignore_template_download {
     /**
      * Capability required to download a template.
      *
-     * The same one that gates the form section: whoever may edit the activity
-     * may read its templates.
+     * The same one that gates the form section: whoever may manage an
+     * activity's templates may read them.
      */
-    const CAPABILITY = 'moodle/course:manageactivities';
+    const CAPABILITY = 'plagiarism/pchkorg:manageignoretemplates';
 
     /** Used when the service does not tell us what the file is. */
     const DEFAULT_MIME = 'application/octet-stream';
