@@ -226,6 +226,34 @@ class ignore_template_capability_test extends \advanced_testcase {
     }
 
     /**
+     * The state a real upgrade actually runs in: Moodle reads db/access.php in
+     * upgrade_component_updated(), which happens after the upgrade function has
+     * returned, so the capability is not in the capabilities table yet while
+     * the step runs. assign_capability() throws on a capability it cannot find,
+     * so the step has to register the plugin's definitions itself.
+     */
+    public function test_the_upgrade_step_runs_before_the_capability_is_registered(): void {
+        global $DB;
+
+        $user = $this->user_with_custom_role('cce');
+
+        $DB->delete_records('capabilities', ['name' => self::CAPABILITY]);
+        \cache::make('core', 'capabilities')->delete('core_capabilities');
+        accesslib_clear_all_caches_for_unit_testing();
+
+        set_config('version', 2026082600, 'plagiarism_pchkorg');
+
+        $this->assertTrue(xmldb_plagiarism_pchkorg_upgrade(2026082600));
+        accesslib_clear_all_caches_for_unit_testing();
+
+        $this->assertTrue(
+            $DB->record_exists('capabilities', ['name' => self::CAPABILITY]),
+            'the step registers the capability it is about to hand out'
+        );
+        $this->assertTrue($this->can_manage($user));
+    }
+
+    /**
      * Splitting the shortname list in two must not change what the rest of the
      * plugin sees, in particular the auto-registration query.
      */

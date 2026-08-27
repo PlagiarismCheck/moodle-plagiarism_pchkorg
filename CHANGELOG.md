@@ -2,6 +2,34 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.16.6 — 27 August 2026
+
+**Fixed: upgrading to v3.16.4 or v3.16.5 could stop with "Capability
+'plagiarism/pchkorg:manageignoretemplates' was not found! This has to be fixed
+in code."** The upgrade aborted there and the site stayed on the plugin version
+it already had.
+
+The capability introduced in v3.16.4 comes with an upgrade step that grants it
+to the custom teaching roles this plugin recognises by name, so an assistant who
+could manage templates before that release still can. Moodle registers a
+plugin's capabilities from `db/access.php` in `upgrade_component_updated()`,
+which runs *after* the plugin's own upgrade steps have finished — so the step
+was handing out a capability Moodle had not installed yet, and
+`assign_capability()` refuses by design to record a permission for a capability
+it cannot find. The step now registers this plugin's capability definitions
+before it grants anything.
+
+Only sites holding at least one of those custom roles were affected. Everywhere
+else the step had no role to grant anything to and never reached the refusal.
+This is how every supported Moodle release orders an upgrade, 3.9 through 5.2;
+the Moodle version in use made no difference to whether it happened.
+
+*Expect this:* on an affected site, install v3.16.6 over the failed copy and run
+the upgrade again. Nothing needs cleaning up first — the upgrade stopped before
+it had changed anything, so the site is exactly where it was, and the grant goes
+through this time. Sites that took v3.16.4 or v3.16.5 without an error are
+already correct, and this release changes nothing for them.
+
 ## v3.16.5 — 26 August 2026
 
 **Fixed: on Moodle 3.9 to 4.1, attaching an ignored template reported "That
@@ -254,6 +282,8 @@ that serves them.
 - `v3.16.4` adds the `plagiarism/pchkorg:manageignoretemplates` capability. Its
   upgrade step assigns it to existing custom teaching roles by shortname and
   changes no data; it is safe to re-run and does not override a permission a
-  site has already set.
+  site has already set. That step failed with a "Capability ... was not found"
+  coding error in `v3.16.4` and `v3.16.5`; upgrade straight to `v3.16.6`, which
+  fixes it, and re-run the upgrade if one has already stopped that way.
 - If the backend does not yet expose the ignore-template endpoints, deploy this
   plugin anyway: with the setting off it behaves exactly as before.

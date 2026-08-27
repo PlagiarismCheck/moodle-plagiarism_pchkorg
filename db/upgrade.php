@@ -142,13 +142,14 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         // there reaches them. Grant it to the ones this plugin already knows
         // by name, so a TA who could manage templates yesterday still can.
         //
-        // Runs before the capability itself is registered: Moodle reads
-        // db/access.php in upgrade_component_updated(), after this function
-        // returns. That is fine. assign_capability() writes a role_capabilities
-        // row without consulting the capabilities table, and the cleanup that
-        // follows only drops capabilities missing from db/access.php, which
-        // this one is not.
-        //
+        // This runs before Moodle has registered the capability: db/access.php
+        // is read in upgrade_component_updated(), after this function returns.
+        // assign_capability() refuses to write a role_capabilities row for a
+        // capability missing from the capabilities table, so register the
+        // plugin's definitions here first. update_capabilities() is idempotent
+        // and core running it again a moment later changes nothing.
+        update_capabilities('plagiarism_pchkorg');
+
         // Only existing roles are touched, and only this capability. A site
         // that wants a different answer overrides it in the usual place;
         // nothing here runs a second time to undo that.
