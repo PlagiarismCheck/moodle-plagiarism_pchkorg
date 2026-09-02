@@ -117,7 +117,7 @@ class plagiarism_pchkorg_roles {
         global $DB;
 
         $shortnames = self::custom_teacher_shortnames();
-        list($insql, $params) = $DB->get_in_or_equal($shortnames, SQL_PARAMS_NAMED);
+        [$insql, $params] = $DB->get_in_or_equal($shortnames, SQL_PARAMS_NAMED);
         $roles = $DB->get_records_select('role', "LOWER(shortname) {$insql}", $params, '', 'id, shortname');
 
         $systemcontextid = \context_system::instance()->id;
