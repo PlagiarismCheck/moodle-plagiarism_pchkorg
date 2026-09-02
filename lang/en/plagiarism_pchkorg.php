@@ -62,6 +62,10 @@ $string['pchkorg_debug_student_not_allowed_see_widget'] = 'Students can not see 
 $string['pchkorg_student_can_see_widget'] = 'Students can see a similarity score';
 $string['pchkorg_student_can_see_report'] = 'Students can access a similarity report';
 $string['pchkorg_check_ai'] = 'Enable AI Detector';
+$string['pchkorg_check_ai_default'] = 'Enable AI Detector by default';
+$string['pchkorg_check_ai_default_help'] = 'Whether AI detection runs for activities that do not set it themselves.
+This is the value proposed when an activity is created, and the one used for activities saved before this setting existed.
+An activity that sets AI detection itself always overrides this.';
 $string['pchkorg:teacherautoregistration'] = 'Enable Teacher auto-registration';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />

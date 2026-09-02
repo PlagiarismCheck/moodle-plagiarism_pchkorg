@@ -200,23 +200,100 @@ class sender_test extends \advanced_testcase {
     /**
      * The source_min_percent value in a multipart body.
      *
-     * Read out of the body rather than asserted against as a substring: the
-     * number alone appears in course and activity ids too, so a bare
-     * assertStringContainsString('0') would pass on almost anything.
-     *
      * @param \plagiarism_pchkorg_fake_transport $transport
      * @return string|null Value sent, or null when the field was left out.
      */
     private function sent_min_percent($transport) {
+        return $this->sent_filter($transport, 'source_min_percent');
+    }
+
+    /**
+     * One filter's value in a multipart body.
+     *
+     * Read out of the body rather than asserted against as a substring: the
+     * values are 0 and 1, which appear in course and activity ids too, so a
+     * bare assertStringContainsString('0') would pass on almost anything.
+     *
+     * @param \plagiarism_pchkorg_fake_transport $transport
+     * @param string $name Filter name as it goes over the wire.
+     * @return string|null Value sent, or null when the field was left out.
+     */
+    private function sent_filter($transport, $name) {
         $body = $transport->request()['params'];
 
         $matched = preg_match(
-            '/name="source_min_percent"\r\n\r\n(.*)\r\n/',
+            '/name="' . preg_quote($name, '/') . '"\r\n\r\n(.*)\r\n/',
             $body,
             $matches
         );
 
         return $matched ? $matches[1] : null;
+    }
+
+    /**
+     * With nothing configured anywhere, AI detection is asked for. This is what
+     * every site did before the setting reached the service, and taking the
+     * plugin's release must not quietly turn it off.
+     */
+    public function test_ai_detection_is_requested_by_default(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.');
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('1', $this->sent_filter($transport, 'enable_ai_detection'));
+    }
+
+    /**
+     * A teacher switching AI detection off for the activity is told to the
+     * service, which is the whole point: it used to be applied in Moodle only,
+     * hiding a result the service had already been paid to produce.
+     */
+    public function test_ai_detection_off_for_activity_is_sent(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.', ['pchkorg_check_ai' => '0']);
+        \plagiarism_pchkorg_config_model::reset_caches();
+
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('0', $this->sent_filter($transport, 'enable_ai_detection'));
+    }
+
+    /**
+     * An activity with no setting of its own -- one saved before the setting
+     * existed -- defers to the site-wide one.
+     */
+    public function test_site_ai_setting_is_used_without_an_activity_one(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.');
+        $this->set_site_config('pchkorg_check_ai', '0');
+        \plagiarism_pchkorg_config_model::reset_caches();
+
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('0', $this->sent_filter($transport, 'enable_ai_detection'));
+    }
+
+    /**
+     * The activity's own setting beats the site-wide one in both directions,
+     * so a teacher can switch AI detection on where the site defaults it off.
+     */
+    public function test_activity_ai_setting_overrides_the_site_one(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.', ['pchkorg_check_ai' => '1']);
+        $this->set_site_config('pchkorg_check_ai', '0');
+        \plagiarism_pchkorg_config_model::reset_caches();
+
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
+        $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame('1', $this->sent_filter($transport, 'enable_ai_detection'));
     }
 
     /**

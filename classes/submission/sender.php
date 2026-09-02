@@ -164,6 +164,20 @@ class plagiarism_pchkorg_sender {
             ),
         ];
 
+        // AI detection. The per-activity setting wins over the site-wide one,
+        // and anything but an explicit 0 means on, so a site that has never
+        // saved either keeps having AI detection run.
+        //
+        // Sent unconditionally, exactly like the threshold below: the service
+        // stores the last value it was told for an activity and has no other
+        // way to hear that a teacher switched AI detection off, so leaving the
+        // field out would keep it running on every future submission.
+        $checkai = $this->configmodel->get_filter_for_module($cm->id, 'pchkorg_check_ai');
+        if (null === $checkai) {
+            $checkai = $this->configmodel->get_system_config('pchkorg_check_ai');
+        }
+        $filters['enable_ai_detection'] = ('0' === (string) $checkai) ? '0' : '1';
+
         // Ignore templates. The key goes out for every activity type, quiz and
         // forum included, because it is built from a course module id and the
         // service treats it as opaque.

@@ -144,7 +144,12 @@ function plagiarism_pchkorg_coursemodule_standard_elements($formwrapper, $mform)
                 $exportedvalues['pchkorg_check_ai']
             )
         ) {
-            $mform->setDefault('pchkorg_check_ai', 1);
+            // The site-wide setting is what a new activity is offered, and what
+            // an activity that never stores its own is checked with. Anything
+            // but an explicit 0 -- an unset site setting included -- means on,
+            // which is the behaviour every existing site already has.
+            $sitecheckai = $pchkorgconfigmodel->get_system_config('pchkorg_check_ai');
+            $mform->setDefault('pchkorg_check_ai', ('0' === (string) $sitecheckai) ? '0' : '1');
         }
 
         if (null === $cm) {

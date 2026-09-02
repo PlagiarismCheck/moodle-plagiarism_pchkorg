@@ -108,6 +108,20 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         );
         $mform->setDefault('pchkorg_enabled_by_default', '1');
 
+        // Deliberately the same setting name the activity form uses. Stored
+        // against cm 0 it is the site-wide value, and an activity storing the
+        // same name overrides it -- the arrangement pchkorg_min_percent
+        // already has, and what lets the sender fall back to this for an
+        // activity that has never been saved.
+        $mform->addElement(
+            'select',
+            'pchkorg_check_ai',
+            get_string('pchkorg_check_ai_default', 'plagiarism_pchkorg'),
+            [get_string('no'), get_string('yes')]
+        );
+        $mform->addHelpButton('pchkorg_check_ai', 'pchkorg_check_ai_default', 'plagiarism_pchkorg');
+        $mform->setDefault('pchkorg_check_ai', '1');
+
         $mform->addElement(
             'select',
             'pchkorg_teacher_auto_registration',

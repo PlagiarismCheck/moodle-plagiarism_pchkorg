@@ -2,6 +2,43 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.17.0 — 2 September 2026
+
+**Changed: "Enable AI Detector" now stops the AI check from being run, instead
+of only hiding its result.** The activity setting has always been honoured in
+Moodle — an activity with it switched off showed a similarity score alone — but
+the setting never left the site. PlagiarismCheck.org was told nothing about it,
+ran AI detection on every submission regardless, and the plugin quietly dropped
+the answer it got back. Teachers turning it off were paying, in processing time,
+for a result nobody was ever shown.
+
+The setting now travels with the submission, like the source threshold and the
+quotes, references and self-plagiarism filters already do, and
+PlagiarismCheck.org skips creating the AI check for an activity where it is off.
+Nothing about the plugin's own display changed: an activity with it on still
+shows the AI score beside the similarity score, and an activity with it off
+still shows the similarity score alone.
+
+**Added: "Enable AI Detector by default", a site-wide setting** under *Site
+administration ▸ Plugins ▸ Plagiarism ▸ PlagiarismCheck*. It is what a newly
+created activity is offered, and what an activity that has never stored a choice
+of its own is checked with. It ships set to Yes, so an untouched site behaves
+exactly as it did. An activity that sets AI detection itself always overrides
+it.
+
+*Expect this:* nothing changes until someone switches AI detection off. Every
+activity carries the setting it already had, and every one of them defaults to
+on. On an activity where a teacher had already turned it off, submissions
+checked from now on will have no AI result at PlagiarismCheck.org at all, where
+before there was one that Moodle did not display; results already stored are
+untouched.
+
+*One rough edge:* the widget decides whether to show an AI score from the
+activity's own stored setting, and an activity created before v3.16 may have
+none stored. Such an activity has AI detection run for it, as it always has, but
+its AI score stays hidden until the activity is opened and saved once, which
+stores the setting. Saving changes nothing else.
+
 ## v3.16.6 — 27 August 2026
 
 **Fixed: upgrading to v3.16.4 or v3.16.5 could stop with "Capability
