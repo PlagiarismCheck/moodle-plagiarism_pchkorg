@@ -92,10 +92,13 @@ class ignore_template_test extends \basic_testcase {
         $transport = new \plagiarism_pchkorg_fake_transport([
             '{"success":false,"code":"invalid_token"}',
         ]);
-        $provider = new \plagiarism_pchkorg_api_provider('nope', 'https://example.org', $transport);
+        // Deliberately a group token: a personal one is never sent, so it would
+        // pass this test without the rejection it is meant to be about.
+        $provider = new \plagiarism_pchkorg_api_provider('G-nope', 'https://example.org', $transport);
 
         $result = $provider->validate_token();
 
+        $this->assertTrue($result->checked);
         $this->assertFalse($result->ok);
         $this->assertTrue($result->reachable);
     }
@@ -204,16 +207,14 @@ class ignore_template_test extends \basic_testcase {
             'https://example.org/lms/moodle/assignment/ignore-templates/save/',
             $request['url']
         );
-        $body = $request['params'];
-        $this->assertStringContainsString('name="assignment_key"', $body);
-        $this->assertStringContainsString('moodle-abc-1', $body);
-        $this->assertStringContainsString('filename="rubric.txt"', $body);
-        $this->assertStringContainsString('template body', $body);
+        $params = $request['params'];
+        $this->assertSame('moodle-abc-1', $params['assignment_key']);
+        $this->assertInstanceOf('CURLFile', $params['templates[0]']);
+        $this->assertSame('rubric.txt', $params['templates[0]']->getPostFilename());
+        $this->assertSame('template body', file_get_contents($params['templates[0]']->getFilename()));
         // Several deletions in one save is what the assignment form does.
-        $this->assertStringContainsString('name="delete[0]"', $body);
-        $this->assertStringContainsString('name="delete[1]"', $body);
-        $this->assertStringContainsString('11', $body);
-        $this->assertStringContainsString('12', $body);
+        $this->assertSame(11, $params['delete[0]']);
+        $this->assertSame(12, $params['delete[1]']);
     }
 
     /**
@@ -225,9 +226,9 @@ class ignore_template_test extends \basic_testcase {
 
         $provider->ignore_template_save('moodle-abc-1', [], '', [3, 4, 5, 6, 7], 'teacher@example.org');
 
-        $body = $transport->request(0)['params'];
-        for ($index = 0; $index < 5; $index++) {
-            $this->assertStringContainsString(sprintf('name="delete[%d]"', $index), $body);
+        $params = $transport->request(0)['params'];
+        foreach ([3, 4, 5, 6, 7] as $index => $templateid) {
+            $this->assertSame($templateid, $params[sprintf('delete[%d]', $index)]);
         }
     }
 

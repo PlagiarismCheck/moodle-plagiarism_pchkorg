@@ -67,6 +67,31 @@ $string['pchkorg_check_ai_default_help'] = 'Whether AI detection runs for activi
 This is the value proposed when an activity is created, and the one used for activities saved before this setting existed.
 An activity that sets AI detection itself always overrides this.';
 $string['pchkorg:teacherautoregistration'] = 'Enable Teacher auto-registration';
+$string['pchkorg:courseaccess'] = 'Limit report access to a teacher\'s own courses';
+$string['pchkorg:courseaccess_help'] = 'PlagiarismCheck.org normally stores one role per person for your whole institution.
+A teacher can therefore open every report the institution holds, including reports from courses they have nothing to do with.
+This is a problem where the same person teaches one course and studies in another.
+
+Turn this on and each teacher is instead given access one course at a time, as they open reports in it.
+They keep full access to the courses they teach and can no longer open reports from courses they do not.
+
+Three things are worth knowing before you turn this on:
+
+* It changes how people are registered with PlagiarismCheck.org **from now on**.
+Anyone already registered as a teacher keeps their institution-wide access until PlagiarismCheck.org support changes their role.
+On a long-running site very little changes until your membership turns over.
+* Access to a course lasts 48 hours and is renewed every time the teacher opens a report from it.
+Somebody who stops teaching a course loses it within two days without anyone having to do anything.
+* **It changes what a person is called at PlagiarismCheck.org.** Teachers and students registered from now on are
+identified by their Moodle username rather than their email address, so a teacher who already has a personal
+PlagiarismCheck.org account, or two people sharing an address, no longer collide with one another.
+Their email address is still sent to PlagiarismCheck.org and is where it writes to them.
+Anyone already registered under their email address goes on being recognised by it.
+Turning this option off again is not symmetric: identity reverts to the email address, and a teacher registered only
+under a username is registered again under their address.
+
+Reports from submissions made before your site recorded course information, and reports that did not come from Moodle at all,
+are unaffected: those stay governed by the institution-wide role.';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>
@@ -110,6 +135,9 @@ $string['pchkorg_label_queued'] = 'In queue';
 $string['pchkorg_report_open'] = 'Open the report';
 $string['pchkorg_report_not_available'] = 'This originality report is not available.';
 $string['pchkorg_report_not_allowed'] = 'You are not allowed to open this originality report.';
+$string['pchkorg_report_access_unavailable'] =
+    'PlagiarismCheck.org could not confirm your access to this course, so the report was not opened. '
+    . 'This is usually transient; please try again in a moment.';
 $string['pchkorg_auto_registration_unavailable'] =
     'PlagiarismCheck.org could not confirm the teacher auto-registration setting for a user, so this run was stopped '
     . 'without changing any configuration. This is usually transient; the task will try again on its next scheduled run.';
@@ -246,10 +274,35 @@ $string['pchkorg_refresh_results_none'] = 'There were no finished checks in this
 $string['pchkorg_token_valid'] = 'The PlagiarismCheck.org API token is valid.';
 $string['pchkorg_token_invalid'] = 'The PlagiarismCheck.org API token is invalid.';
 $string['pchkorg_token_unavailable'] = 'The token could not be validated because PlagiarismCheck.org is unavailable.';
+
+// The account panel, shown above the settings form for an institutional token.
+$string['pchkorg_group_heading'] = 'PlagiarismCheck.org account';
+$string['pchkorg_group_intro'] =
+    'The institution this site\'s API token belongs to. Check that it is the one you expect before saving.';
+$string['pchkorg_group_name'] = 'Institution';
+$string['pchkorg_group_id'] = 'Institution ID';
+$string['pchkorg_group_status'] = 'Status';
+$string['pchkorg_group_status_enabled'] = 'Active';
+$string['pchkorg_group_status_disabled'] = 'Disabled';
+$string['pchkorg_group_members'] = 'Members';
+$string['pchkorg_group_members_of'] = '{$a->current} of {$a->max}';
+$string['pchkorg_group_pages'] = 'Pages remaining';
+$string['pchkorg_group_expires'] = 'Expires';
+$string['pchkorg_group_expired'] = 'Expired';
+$string['pchkorg_group_unavailable'] =
+    'Account information could not be loaded because PlagiarismCheck.org is unavailable. This does not mean the token is '
+    . 'wrong, and settings can still be saved.';
+$string['pchkorg_group_unknown'] =
+    'PlagiarismCheck.org does not recognise this API token, so no account information can be shown.';
 $string['privacy:metadata:plagiarism_pchkorg:email'] =
     'The email address of the user acting on an activity. It is normally sent as a one-way hash, which is enough for the '
     . 'service to confirm they belong to the institution. When auto-registration is enabled and the user does not yet '
     . 'have an account, the full address is sent instead, so that an account can be created for them.';
+$string['privacy:metadata:plagiarism_pchkorg:username'] =
+    'The Moodle username of the user acting on an activity, sent only where the site limits report access to a '
+    . 'teacher\'s own courses. On such a site the username, prefixed with an identifier for this site, is what names '
+    . 'the person at the service in place of their email address, and it is sent as a one-way hash except when '
+    . 'auto-registration creates their account.';
 $string['privacy:metadata:plagiarism_pchkorg:name'] =
     'The first and last name of the user, sent only when auto-registration creates an account for them on the service';
 $string['privacy:metadata:plagiarism_pchkorg:assignment_key'] =
@@ -262,6 +315,14 @@ $string['privacy:metadata:plagiarism_pchkorg:plugin_version'] =
     . 'any user.';
 $string['privacy:metadata:plagiarism_pchkorg:template_filename'] = 'The file name of an uploaded activity template';
 $string['privacy:metadata:plagiarism_pchkorg:template_content'] = 'The content of an uploaded or pasted activity template';
+$string['privacy:metadata:plagiarism_pchkorg:course_id'] =
+    'The identifier of a course a teacher is opening a report in, sent only where report access is limited to a '
+    . 'teacher\'s own courses, so the service knows which reports that teacher may see';
+$string['privacy:metadata:plagiarism_pchkorg:course_name'] =
+    'The name of the course a submission was made in, such as Introduction to Biology, so reports on the service name '
+    . 'the course rather than showing its number. It describes the course, not any user.';
+$string['privacy:metadata:plagiarism_pchkorg:role'] =
+    'That the person named by the course above teaches it, sent with it for the same reason';
 
 // The table remembering who has already been registered with the service.
 $string['privacy:metadata:plagiarism_pchkorg_users'] =

@@ -140,3 +140,56 @@
     margin-bottom: 0;
     cursor: pointer;
 }
+
+/* The account this site's token belongs to, above the site settings form. */
+
+.pchkorg-group-panel {
+    max-width: 42em;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 0.25rem;
+}
+
+.pchkorg-group-heading {
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+    font-size: 1.1rem;
+}
+
+.pchkorg-group-intro,
+.pchkorg-group-message {
+    margin-bottom: 0.5rem;
+    font-size: 0.9em;
+    opacity: 0.75;
+}
+
+.pchkorg-group-message {
+    margin-bottom: 0;
+}
+
+.pchkorg-group-table {
+    margin: 0;
+    border-collapse: collapse;
+}
+
+.pchkorg-group-table th,
+.pchkorg-group-table td {
+    padding: 0.15rem 0;
+    border: 0;
+    text-align: left;
+    vertical-align: top;
+}
+
+.pchkorg-group-label {
+    padding-right: 1.5rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* An expiry that has passed, or an account switched off at the service: the
+   token is right but checks will not run, which is worth interrupting for. */
+.pchkorg-group-warning {
+    font-weight: 600;
+    color: #a94442;
+}

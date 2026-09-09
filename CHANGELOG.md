@@ -2,6 +2,76 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.20.0 — 11 September 2026
+
+- Submissions now carry the **course fullname** as well as the course ID, so
+  PlagiarismCheck.org group reports name the course instead of showing a bare
+  number. Both send paths carry it, institutional and personal tokens alike.
+- The name is read from Moodle's course cache and looked up once per course per
+  run. A course whose name cannot be read is sent without one, and the
+  submission is checked exactly as before.
+- **Requires the matching service-side release**, which adds the `course_name`
+  field. Sending it to an older service is harmless — the field is ignored —
+  and an older plugin against the newer service simply records no course name.
+
+## v3.19.0 — 10 September 2026
+
+- With **"Limit report access to a teacher's own courses"** turned on, people
+  are now registered with PlagiarismCheck.org under their Moodle username,
+  namespaced per site, rather than their email address. A teacher who already
+  has a personal PlagiarismCheck.org account, and two people sharing one
+  address, no longer collide with one another.
+- The address is still sent, in a new `additional_email` field, and is where
+  PlagiarismCheck.org writes to the person. Nothing is looked up by it.
+- Anyone already registered under their email address goes on being recognised
+  by it, so turning the setting on does not register existing teachers a second
+  time or orphan their reports. Turning it off again is not symmetric.
+- A teacher whose Moodle account holds an unusable email address is now
+  registerable on such a site; they simply get no delivery address.
+- Nothing changes on a site that leaves the setting off. **Requires the matching
+  service-side release**, which adds the `additional_email` field.
+
+## v3.18.1 — 9 September 2026
+
+- **Fixed:** a valid personal (non-institutional) API token was reported as
+  invalid whenever plugin settings were saved. The check behind that message
+  only recognises institutional tokens, so personal ones are no longer sent to
+  it.
+- The settings page now names the PlagiarismCheck.org account the site's token
+  belongs to — the institution's name and ID, whether it is active, members or
+  pages remaining, and any expiry date — so a token pasted into the wrong site
+  is visible there rather than only showing up as submissions failing later. A
+  disabled account or a subscription that has already expired is highlighted,
+  both being reasons checks stop working while the token itself is still
+  correct.
+- The details are read each time the page is opened, so they reflect the
+  account as it is now. The page still loads normally when
+  PlagiarismCheck.org cannot be reached; it says so in place of the details.
+- No service-side change is required: this uses the token validation endpoint
+  the plugin already called.
+
+## v3.18.0 — 9 September 2026
+
+- **New site-wide setting "Limit report access to a teacher's own courses"**
+  under *Site administration ▸ Plugins ▸ Plagiarism ▸ PlagiarismCheck*. Ships as
+  No, so an untouched site behaves exactly as before.
+- PlagiarismCheck.org stores one role per person for a whole institution, so a
+  teacher can open every report the institution holds — a problem where the same
+  person teaches one course and studies in another. With the new setting on, a
+  teacher is instead given access one course at a time, as they open reports in
+  it, and can no longer open reports from courses they do not teach.
+- Access to a course lasts 48 hours and is renewed on every report opened from
+  it, so somebody who stops teaching a course loses it within two days without
+  an administrator having to do anything.
+- The setting changes how people are registered with PlagiarismCheck.org **from
+  then on**. Anyone already registered as a teacher keeps institution-wide
+  access until PlagiarismCheck.org support changes their role, so a long-running
+  site sees little change until its membership turns over.
+- Reports from submissions made before the site recorded course information, and
+  reports that did not come from Moodle, stay governed by the institution-wide
+  role.
+- Requires a PlagiarismCheck.org service release that supports per-course access.
+
 ## v3.17.0 — 2 September 2026
 
 - **"Enable AI Detector" now stops the AI check from being run**, instead of only

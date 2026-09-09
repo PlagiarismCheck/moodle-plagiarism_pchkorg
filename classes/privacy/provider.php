@@ -135,17 +135,31 @@ class provider implements
         // The two version fields describe the site rather than any person, and
         // are listed because everything leaving Moodle is declared here, not
         // because they carry personal data.
+        //
+        // course_id and role are sent only where report access is limited to a
+        // teacher's own courses. Neither identifies anyone by itself, but they
+        // are sent alongside the hashed email and so describe that person's
+        // teaching, which is why they are declared rather than treated as
+        // configuration.
+        //
+        // course_name is the course's own title and describes the course rather
+        // than any person, like the version fields above. It is declared for
+        // the same reason they are: everything leaving Moodle is listed here.
         $collection->add_external_location_link(
             'plagiarism_pchkorg',
             [
                         'file' => 'privacy:metadata:plagiarism_pchkorg:file',
                         'email' => 'privacy:metadata:plagiarism_pchkorg:email',
+                        'username' => 'privacy:metadata:plagiarism_pchkorg:username',
                         'name' => 'privacy:metadata:plagiarism_pchkorg:name',
                         'assignment_key' => 'privacy:metadata:plagiarism_pchkorg:assignment_key',
                         'moodle_version' => 'privacy:metadata:plagiarism_pchkorg:moodle_version',
                         'plugin_version' => 'privacy:metadata:plagiarism_pchkorg:plugin_version',
                         'template_filename' => 'privacy:metadata:plagiarism_pchkorg:template_filename',
                         'template_content' => 'privacy:metadata:plagiarism_pchkorg:template_content',
+                        'course_id' => 'privacy:metadata:plagiarism_pchkorg:course_id',
+                        'course_name' => 'privacy:metadata:plagiarism_pchkorg:course_name',
+                        'role' => 'privacy:metadata:plagiarism_pchkorg:role',
                 ],
             'privacy:metadata:plagiarism_pchkorg'
         );
@@ -431,9 +445,13 @@ class provider implements
     /**
      * Forget that this user was registered with the service.
      *
-     * The row is keyed by email, not by user id, so the address has to be read
-     * back before it can be removed. If the account is already gone there is
-     * nothing to match on and nothing to do.
+     * The row is keyed by the identifier the user was registered under, not by
+     * user id, so it has to be read back before it can be removed. That
+     * identifier is their email on an institution-wide site and their namespaced
+     * username on a course-scoped one -- and a site that switched between the two
+     * may hold either for the same person, so both are deleted rather than
+     * whichever the current setting implies. If the account is already gone there
+     * is nothing to match on and nothing to do.
      *
      * Note this is a record of a registration, not the registration itself: the
      * account at PlagiarismCheck.org is unaffected, and while the Moodle account
@@ -445,11 +463,23 @@ class provider implements
     private static function forget_service_registration($userid) {
         global $DB;
 
-        $email = $DB->get_field('user', 'email', ['id' => $userid]);
-        if (empty($email)) {
+        $user = $DB->get_record('user', ['id' => $userid], 'id, email, username');
+        if (empty($user)) {
             return;
         }
 
-        $DB->delete_records('plagiarism_pchkorg_users', ['email' => $email]);
+        $identifiers = [];
+        if (!empty($user->email)) {
+            $identifiers[] = $user->email;
+        }
+        if (!empty($user->username)) {
+            $identifiers[] = \plagiarism_pchkorg_service_login::namespaced($user);
+        }
+
+        if (empty($identifiers)) {
+            return;
+        }
+
+        $DB->delete_records_list('plagiarism_pchkorg_users', 'email', $identifiers);
     }
 }

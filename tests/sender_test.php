@@ -41,6 +41,8 @@ class sender_test extends \advanced_testcase {
     protected function setUp(): void {
         parent::setUp();
         \plagiarism_pchkorg_config_model::reset_caches();
+        \plagiarism_pchkorg_api_provider::reset_caches();
+        \plagiarism_pchkorg_service_login::reset_cache();
     }
 
     /**
@@ -58,10 +60,44 @@ class sender_test extends \advanced_testcase {
         $this->assertSame(\plagiarism_pchkorg_sender::RESULT_SENT, $result->status);
         $this->assertSame(77, $result->textid);
 
-        $body = $transport->request()['params'];
-        $this->assertStringContainsString('name="text"', $body);
-        $this->assertStringContainsString('text/plain', $body);
-        $this->assertStringContainsString('-submission.txt', $body);
+        $params = $transport->request()['params'];
+        $this->assertInstanceOf('CURLFile', $params['text']);
+        $this->assertSame('text/plain', $params['text']->getMimeType());
+        $this->assertStringContainsString('-submission.txt', $params['text']->getPostFilename());
+    }
+
+    /**
+     * A real file is uploaded from the file pool, not copied through a PHP
+     * string and a second temporary file on the way out.
+     *
+     * Asserted against the pool's own path because that is the only visible
+     * difference: reading the document into memory would still produce a
+     * working request, just one that costs the size of the document per record
+     * processed, which is exactly the regression that would go unnoticed.
+     */
+    public function test_file_submission_uploads_from_the_file_pool(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_quiz();
+        $transport = new \plagiarism_pchkorg_fake_transport([$this->success(88)]);
+
+        $result = $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
+
+        $this->assertSame(\plagiarism_pchkorg_sender::RESULT_SENT, $result->status);
+
+        $file = get_file_storage()->get_file_by_id($data->filedb->fileid);
+        $poolpath = get_file_storage()
+            ->get_file_system()
+            ->get_local_path_from_storedfile($file, true);
+
+        $params = $transport->request()['params'];
+        $this->assertInstanceOf('CURLFile', $params['text']);
+        $this->assertSame($poolpath, $params['text']->getFilename());
+        $this->assertSame('answer.txt', $params['text']->getPostFilename());
+        $this->assertSame(
+            'An essay answer about turtles.',
+            file_get_contents($params['text']->getFilename())
+        );
     }
 
     /**
@@ -208,26 +244,24 @@ class sender_test extends \advanced_testcase {
     }
 
     /**
-     * One filter's value in a multipart body.
+     * One filter's value as sent.
      *
-     * Read out of the body rather than asserted against as a substring: the
-     * values are 0 and 1, which appear in course and activity ids too, so a
-     * bare assertStringContainsString('0') would pass on almost anything.
+     * Values are cast to string because that is what they become on the wire:
+     * curl stringifies the form fields, so a test asserting against 1 rather
+     * than '1' would be asserting about the PHP value and not the request.
      *
      * @param \plagiarism_pchkorg_fake_transport $transport
      * @param string $name Filter name as it goes over the wire.
      * @return string|null Value sent, or null when the field was left out.
      */
     private function sent_filter($transport, $name) {
-        $body = $transport->request()['params'];
+        $params = $transport->request()['params'];
 
-        $matched = preg_match(
-            '/name="' . preg_quote($name, '/') . '"\r\n\r\n(.*)\r\n/',
-            $body,
-            $matches
-        );
+        if (!array_key_exists($name, $params)) {
+            return null;
+        }
 
-        return $matched ? $matches[1] : null;
+        return (string) $params[$name];
     }
 
     /**
@@ -375,13 +409,12 @@ class sender_test extends \advanced_testcase {
         $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
         $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
 
-        $body = $transport->request()['params'];
-        $this->assertStringContainsString(
+        $params = $transport->request()['params'];
+        $this->assertSame(
             \plagiarism_pchkorg_assignment_key::for_cmid($data->cm->id),
-            $body
+            $params['assignment_key']
         );
-        $this->assertStringContainsString('name="ignore_templates_enabled"', $body);
-        $this->assertStringContainsString("\r\n\r\n0\r\n", $body);
+        $this->assertSame('0', (string) $params['ignore_templates_enabled']);
     }
 
     /**
@@ -397,9 +430,8 @@ class sender_test extends \advanced_testcase {
         $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
         $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
 
-        $body = $transport->request()['params'];
-        $this->assertStringContainsString('name="ignore_templates_enabled"', $body);
-        $this->assertStringContainsString("\r\n\r\n1\r\n", $body);
+        $params = $transport->request()['params'];
+        $this->assertSame('1', (string) $params['ignore_templates_enabled']);
     }
 
     /**
@@ -414,13 +446,12 @@ class sender_test extends \advanced_testcase {
         $transport = new \plagiarism_pchkorg_fake_transport([$this->success(1)]);
         $this->sender($transport)->send($data->filedb, $data->cm, $data->user);
 
-        $body = $transport->request()['params'];
+        $params = $transport->request()['params'];
 
         // Asserted against the running Moodle rather than a literal, so the
         // test does not need editing on every Moodle upgrade.
         $version = \plagiarism_pchkorg_site_version::moodle_major();
-        $this->assertStringContainsString('name="moodle_version"', $body);
-        $this->assertStringContainsString("\r\n\r\n" . $version . "\r\n", $body);
+        $this->assertSame($version, (string) $params['moodle_version']);
 
         // Asserted with preg_match because assertMatchesRegularExpression needs
         // PHPUnit 9, and Moodle 3.9 ships 7.
@@ -428,23 +459,22 @@ class sender_test extends \advanced_testcase {
 
         $plugin = new \stdClass();
         require($CFG->dirroot . '/plagiarism/pchkorg/version.php');
-        $this->assertStringContainsString('name="plugin_version"', $body);
-        $this->assertStringContainsString("\r\n\r\n" . $plugin->release . "\r\n", $body);
+        $this->assertSame($plugin->release, (string) $params['plugin_version']);
     }
 
     /**
-     * Assert the multipart body carries the key for a course module.
+     * Assert the request carries the key for a course module.
      *
      * @param \plagiarism_pchkorg_fake_transport $transport
      * @param int $cmid
      */
     private function assert_activity_key_sent($transport, $cmid) {
-        $body = $transport->request()['params'];
+        $params = $transport->request()['params'];
 
-        $this->assertStringContainsString('name="assignment_key"', $body);
-        $this->assertStringContainsString(
+        $this->assertArrayHasKey('assignment_key', $params);
+        $this->assertSame(
             \plagiarism_pchkorg_assignment_key::for_cmid($cmid),
-            $body
+            $params['assignment_key']
         );
     }
 
@@ -649,6 +679,81 @@ class sender_test extends \advanced_testcase {
         );
 
         return new \plagiarism_pchkorg_sender($provider, new \plagiarism_pchkorg_config_model());
+    }
+
+    /**
+     * On a course-scoped site a submission is attributed to the username.
+     *
+     * The author hash and the acting credential are both built from the
+     * identity, and a submission hashed under a string the service has no
+     * member for is attributed to nobody. This pins that both carry the
+     * namespaced login rather than the address.
+     */
+    public function test_course_mode_attributes_the_submission_to_the_login(): void {
+        $this->resetAfterTest(true);
+
+        $configmodel = new \plagiarism_pchkorg_config_model();
+        $configmodel->set_system_config('pchkorg_course_access', '1');
+
+        $data = $this->setup_assign('Some text.');
+        // A group token resolves membership over the network, so the send is
+        // the second request, not the first.
+        $transport = new \plagiarism_pchkorg_fake_transport([
+            json_encode(['is_member' => true, 'is_auto_registration_enabled' => false]),
+            $this->success(1),
+        ]);
+        $provider = new \plagiarism_pchkorg_api_provider(
+            'G-group-token',
+            'https://service.example',
+            $transport
+        );
+        $sender = new \plagiarism_pchkorg_sender($provider, $configmodel);
+
+        $sender->send($data->filedb, $data->cm, $data->user);
+
+        $login = \plagiarism_pchkorg_service_login::namespaced($data->user);
+        $this->assertNotSame($login, $data->user->email);
+
+        // The membership lookup asked about the login too.
+        $this->assertSame(
+            $provider->user_email_to_hash($login),
+            $transport->request(0)['params']['hash']
+        );
+
+        $sent = $transport->request(1)['params'];
+        $this->assertSame($provider->user_email_to_hash($login), $sent['hash']);
+        $this->assertContains(
+            'X-API-TOKEN: ' . $provider->generate_api_token($login),
+            $transport->request_headers(1)
+        );
+    }
+
+    /**
+     * An institution-wide site keeps attributing by address, byte for byte.
+     */
+    public function test_institution_mode_attributes_the_submission_to_the_email(): void {
+        $this->resetAfterTest(true);
+
+        $data = $this->setup_assign('Some text.');
+        $transport = new \plagiarism_pchkorg_fake_transport([
+            json_encode(['is_member' => true, 'is_auto_registration_enabled' => false]),
+            $this->success(1),
+        ]);
+        $provider = new \plagiarism_pchkorg_api_provider(
+            'G-group-token',
+            'https://service.example',
+            $transport
+        );
+        $sender = new \plagiarism_pchkorg_sender($provider, new \plagiarism_pchkorg_config_model());
+
+        $sender->send($data->filedb, $data->cm, $data->user);
+
+        $sent = $transport->request(1)['params'];
+        $this->assertSame($provider->user_email_to_hash($data->user->email), $sent['hash']);
+        $this->assertContains(
+            'X-API-TOKEN: ' . $provider->generate_api_token($data->user->email),
+            $transport->request_headers(1)
+        );
     }
 
     /**

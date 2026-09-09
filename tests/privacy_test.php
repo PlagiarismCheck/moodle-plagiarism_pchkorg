@@ -127,6 +127,24 @@ class privacy_test extends \core_privacy\tests\provider_testcase {
     }
 
     /**
+     * Course-scoped access sends a course and a role alongside the hashed
+     * email, so both are declared like everything else that leaves Moodle.
+     */
+    public function test_metadata_declares_course_access_fields(): void {
+        $collection = provider::get_metadata(new \core_privacy\local\metadata\collection('plagiarism_pchkorg'));
+
+        $fields = [];
+        foreach ($collection->get_collection() as $item) {
+            if ('plagiarism_pchkorg' === $item->get_name()) {
+                $fields = \array_keys($item->get_privacy_fields());
+            }
+        }
+
+        $this->assertContains('course_id', $fields);
+        $this->assertContains('role', $fields);
+    }
+
+    /**
      * There is still exactly one external location, not one per feature.
      */
     public function test_metadata_declares_one_external_location(): void {
@@ -342,6 +360,53 @@ class privacy_test extends \core_privacy\tests\provider_testcase {
 
         $this->assertFalse($DB->record_exists('plagiarism_pchkorg_users', ['email' => $this->student->email]));
         $this->assertTrue($DB->record_exists('plagiarism_pchkorg_users', ['email' => $this->otherstudent->email]));
+    }
+
+    /**
+     * A registration recorded under a namespaced username is forgotten too.
+     *
+     * A course-scoped site bookkeeps people by username rather than address, and
+     * a site that has switched modes may hold either for the same person, so
+     * deletion cannot key off whichever the current setting implies.
+     */
+    public function test_delete_for_user_forgets_a_username_registration(): void {
+        global $DB;
+
+        $login = \plagiarism_pchkorg_service_login::namespaced($this->student);
+        $otherlogin = \plagiarism_pchkorg_service_login::namespaced($this->otherstudent);
+        $DB->insert_record('plagiarism_pchkorg_users', (object) ['email' => $login]);
+        $DB->insert_record('plagiarism_pchkorg_users', (object) ['email' => $otherlogin]);
+
+        $contextlist = new approved_contextlist(
+            $this->student,
+            'plagiarism_pchkorg',
+            [$this->context->id]
+        );
+        provider::delete_data_for_user($contextlist);
+
+        $this->assertFalse($DB->record_exists('plagiarism_pchkorg_users', ['email' => $login]));
+        $this->assertTrue($DB->record_exists('plagiarism_pchkorg_users', ['email' => $otherlogin]));
+    }
+
+    /**
+     * Both identifiers go at once, for a person who has been registered twice.
+     */
+    public function test_delete_for_user_forgets_both_identifiers(): void {
+        global $DB;
+
+        $login = \plagiarism_pchkorg_service_login::namespaced($this->student);
+        $DB->insert_record('plagiarism_pchkorg_users', (object) ['email' => $this->student->email]);
+        $DB->insert_record('plagiarism_pchkorg_users', (object) ['email' => $login]);
+
+        $contextlist = new approved_contextlist(
+            $this->student,
+            'plagiarism_pchkorg',
+            [$this->context->id]
+        );
+        provider::delete_data_for_user($contextlist);
+
+        $this->assertFalse($DB->record_exists('plagiarism_pchkorg_users', ['email' => $this->student->email]));
+        $this->assertFalse($DB->record_exists('plagiarism_pchkorg_users', ['email' => $login]));
     }
 
     /**

@@ -428,12 +428,11 @@ class ignore_template_form_test extends \advanced_testcase {
         );
 
         $this->assertNull($result->error);
-        $body = $transport->request()['params'];
-        $this->assertStringContainsString('name="template_text"', $body);
-        $this->assertStringContainsString('The wording students repeat.', $body);
-        $this->assertStringContainsString(
+        $params = $transport->request()['params'];
+        $this->assertSame('The wording students repeat.', $params['template_text']);
+        $this->assertSame(
             \plagiarism_pchkorg_assignment_key::for_cmid($this->cm->id),
-            $body
+            $params['assignment_key']
         );
     }
 
@@ -454,10 +453,43 @@ class ignore_template_form_test extends \advanced_testcase {
         );
 
         $this->assertNull($result->error);
-        $body = $transport->request()['params'];
-        $this->assertStringContainsString('name="templates[0]"', $body);
-        $this->assertStringContainsString('rubric.txt', $body);
-        $this->assertStringContainsString('Marking criteria in full.', $body);
+        $params = $transport->request()['params'];
+        $this->assertInstanceOf('CURLFile', $params['templates[0]']);
+        $this->assertSame('rubric.txt', $params['templates[0]']->getPostFilename());
+        $this->assertSame(
+            'Marking criteria in full.',
+            file_get_contents($params['templates[0]']->getFilename())
+        );
+
+        // Uploaded from the draft area's own pool file. A save can carry
+        // several 25 MB templates, so reading them into strings first would
+        // cost their combined size before the first byte is sent.
+        $draft = $this->only_draft_file($draftid);
+        $this->assertSame(
+            get_file_storage()->get_file_system()->get_local_path_from_storedfile($draft, true),
+            $params['templates[0]']->getFilename()
+        );
+    }
+
+    /**
+     * The single file in a draft area.
+     *
+     * @param int $draftitemid
+     * @return \stored_file
+     */
+    private function only_draft_file($draftitemid) {
+        global $USER;
+
+        $files = get_file_storage()->get_area_files(
+            \context_user::instance($USER->id)->id,
+            'user',
+            'draft',
+            $draftitemid,
+            'filename',
+            false
+        );
+
+        return reset($files);
     }
 
     /**
@@ -481,12 +513,10 @@ class ignore_template_form_test extends \advanced_testcase {
         );
 
         $this->assertNull($result->error);
-        $body = $transport->request()['params'];
-        $this->assertStringContainsString('name="delete[0]"', $body);
-        $this->assertStringContainsString('name="delete[1]"', $body);
-        $this->assertStringNotContainsString('name="delete[2]"', $body);
-        $this->assert_matches_regular_expression_compat('/name="delete\[0\]".*?\r\n\r\n7\r\n/s', $body);
-        $this->assert_matches_regular_expression_compat('/name="delete\[1\]".*?\r\n\r\n11\r\n/s', $body);
+        $params = $transport->request()['params'];
+        $this->assertSame(7, $params['delete[0]']);
+        $this->assertSame(11, $params['delete[1]']);
+        $this->assertArrayNotHasKey('delete[2]', $params);
     }
 
     /**
@@ -862,21 +892,5 @@ class ignore_template_form_test extends \advanced_testcase {
 
         $DB->set_field('plagiarism_pchkorg_config', 'value', $value, ['cm' => 0, 'name' => $name]);
         \plagiarism_pchkorg_config_model::reset_caches();
-    }
-
-    /**
-     * Regular expression assertion that works on PHPUnit 7 through 11.
-     *
-     * @param string $pattern
-     * @param string $subject
-     */
-    private function assert_matches_regular_expression_compat($pattern, $subject) {
-        if (method_exists($this, 'assertMatchesRegularExpression')) {
-            $this->assertMatchesRegularExpression($pattern, $subject);
-
-            return;
-        }
-
-        $this->assertRegExp($pattern, $subject);
     }
 }

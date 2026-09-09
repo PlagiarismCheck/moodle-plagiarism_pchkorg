@@ -115,7 +115,13 @@ class plagiarism_pchkorg_ignore_template_form {
             'plagiarism_pchkorg'
         );
 
-        $templates = $iscreating ? [] : self::fetch_templates($cmid, $configmodel, $USER->email, $apiprovider);
+        // Templates belong to whoever the service knows this teacher as, which
+        // on a course-scoped site is their namespaced username rather than their
+        // address. Asking under the wrong string returns another account's list,
+        // or none.
+        $templates = $iscreating
+            ? []
+            : self::fetch_templates($cmid, $configmodel, $USER, $apiprovider);
 
         // A short lead-in and a slot counter, so the section explains itself
         // without the teacher having to open the help popup first.
@@ -403,7 +409,7 @@ class plagiarism_pchkorg_ignore_template_form {
             $files,
             $text,
             $deleteids,
-            $USER->email
+            plagiarism_pchkorg_service_login::resolve($apiprovider, $USER, $configmodel)->login
         );
 
         if (!$saved) {
@@ -520,6 +526,11 @@ class plagiarism_pchkorg_ignore_template_form {
     /**
      * Read the files a teacher just uploaded out of their draft area.
      *
+     * The content is the stored_file itself rather than its bytes. A save can
+     * carry several templates of up to 25 MB each, and reading every one into a
+     * string before the first is uploaded made the peak cost of a save the sum
+     * of all of them.
+     *
      * @param int $draftitemid
      * @return array Each entry has filename, mime and content.
      */
@@ -534,7 +545,7 @@ class plagiarism_pchkorg_ignore_template_form {
             $files[] = [
                 'filename' => $file->get_filename(),
                 'mime' => $file->get_mimetype(),
-                'content' => $file->get_content(),
+                'content' => $file,
             ];
         }
 
@@ -546,18 +557,18 @@ class plagiarism_pchkorg_ignore_template_form {
      *
      * @param int $cmid
      * @param plagiarism_pchkorg_config_model $configmodel
-     * @param string $email
+     * @param stdClass $user Teacher whose templates these are.
      * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests.
      * @return array|null
      */
-    private static function fetch_templates($cmid, $configmodel, $email, $apiprovider = null) {
+    private static function fetch_templates($cmid, $configmodel, $user, $apiprovider = null) {
         if (null === $apiprovider) {
             $apiprovider = new plagiarism_pchkorg_api_provider($configmodel->get_system_config('pchkorg_token'));
         }
 
         return $apiprovider->ignore_template_list(
             plagiarism_pchkorg_assignment_key::for_cmid($cmid),
-            $email
+            plagiarism_pchkorg_service_login::resolve($apiprovider, $user, $configmodel)->login
         );
     }
 

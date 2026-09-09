@@ -35,7 +35,16 @@ class plagiarism_pchkorg_payload {
     /** @var mixed Identifies the attachment to the service. */
     public $attachmentid;
 
-    /** @var string Document content. */
+    /**
+     * Document content.
+     *
+     * A stored_file wherever the submission is a real file, so it travels to
+     * the service straight from the file pool rather than through a PHP string
+     * the size of the document. Generated text -- online text, a forum post --
+     * has no pool file behind it and stays a string.
+     *
+     * @var string|stored_file
+     */
     public $content;
 
     /** @var string MIME type of the content. */
@@ -49,7 +58,7 @@ class plagiarism_pchkorg_payload {
      *
      * @param mixed $submissionid
      * @param mixed $attachmentid
-     * @param string $content
+     * @param string|stored_file $content
      * @param string $mime
      * @param string $filename
      */
@@ -64,6 +73,11 @@ class plagiarism_pchkorg_payload {
     /**
      * Build a payload from a stored Moodle file.
      *
+     * The file is carried as itself, not as its bytes: reading a 20 MB
+     * submission into a string only to hand it to curl, which uploads from a
+     * path anyway, cost roughly the size of the document in memory per record
+     * processed, inside cron.
+     *
      * @param mixed $submissionid
      * @param stored_file $file
      * @return plagiarism_pchkorg_payload
@@ -72,7 +86,7 @@ class plagiarism_pchkorg_payload {
         return new self(
             $submissionid,
             $file->get_id(),
-            $file->get_content(),
+            $file,
             $file->get_mimetype(),
             $file->get_filename()
         );

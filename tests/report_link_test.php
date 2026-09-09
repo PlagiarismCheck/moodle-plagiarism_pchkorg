@@ -41,6 +41,8 @@ class report_link_test extends \advanced_testcase {
     protected function setUp(): void {
         parent::setUp();
         \plagiarism_pchkorg_config_model::reset_caches();
+        \plagiarism_pchkorg_api_provider::reset_caches();
+        \plagiarism_pchkorg_service_login::reset_cache();
     }
 
     /** @var string Site API token used throughout. Personal, so no HTTP happens. */

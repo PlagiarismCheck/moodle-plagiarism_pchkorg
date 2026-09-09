@@ -28,6 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/state.php');
 require_once(__DIR__ . '/transport.php');
 require_once(__DIR__ . '/curl_transport.php');
+require_once(__DIR__ . '/group_info.php');
 
 /**
  * Class provider HTTP-API methods.
@@ -80,6 +81,16 @@ class plagiarism_pchkorg_api_provider {
     private $transport;
 
     /**
+     * Membership answers already fetched, keyed by identity string.
+     *
+     * Shared by every instance so that repeated checks within one request cost
+     * one HTTP call. {@see reset_caches()} clears it.
+     *
+     * @var array
+     */
+    private static $membercache = [];
+
+    /**
      * Constructor for api provider.
      *
      * @param $token
@@ -108,11 +119,12 @@ class plagiarism_pchkorg_api_provider {
      * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
-     * @param $content
+     * @param string|stored_file $content
      * @param $mime
      * @param $filename
      * @param array $filters
      * @param string|null $email Email of the acting user, for group token auth.
+     * @param string|null $coursename Course fullname, shown in service reports.
      *
      * @return int|null
      */
@@ -127,7 +139,8 @@ class plagiarism_pchkorg_api_provider {
         $mime,
         $filename,
         $filters = [],
-        $email = null
+        $email = null,
+        $coursename = null
     ) {
         if ($this->is_group_token()) {
             return $this->send_group_text(
@@ -141,7 +154,8 @@ class plagiarism_pchkorg_api_provider {
                 $mime,
                 $filename,
                 $filters,
-                $email
+                $email,
+                $coursename
             );
         } else {
             return $this->send_text(
@@ -154,7 +168,8 @@ class plagiarism_pchkorg_api_provider {
                 $mime,
                 $filename,
                 $filters,
-                $email
+                $email,
+                $coursename
             );
         }
     }
@@ -168,11 +183,12 @@ class plagiarism_pchkorg_api_provider {
      * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
-     * @param $content
+     * @param string|stored_file $content
      * @param $mime
      * @param $filename
      * @param array $filters
      * @param string|null $email Email of the acting user, for group token auth.
+     * @param string|null $coursename Course fullname, shown in service reports.
      *
      * @return int|null
      */
@@ -187,15 +203,13 @@ class plagiarism_pchkorg_api_provider {
         $mime,
         $filename,
         $filters = [],
-        $email = null
+        $email = null,
+        $coursename = null
     ) {
-
-        $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
         $response = $this->transport->post(
             $this->endpoint . '/lms/moodle/check-text/',
-            $this->get_body_for_group(
-                $boundary,
+            $this->get_fields_for_group(
                 $authorhash,
                 $cousereid,
                 $assignmentid,
@@ -205,14 +219,17 @@ class plagiarism_pchkorg_api_provider {
                 $content,
                 $mime,
                 $filename,
-                $filters
+                $filters,
+                $coursename
             ),
             [
                         'CURLOPT_RETURNTRANSFER' => true,
                         'CURLOPT_TIMEOUT' => 50,
                         'CURLOPT_HTTPHEADER' => [
                                 'X-API-TOKEN: ' . $this->generate_api_token($email),
-                                'Content-Type: multipart/form-data; boundary=' . $boundary,
+                            // Content-Type is deliberately absent: curl sets it,
+                            // with the boundary it generated for the body.
+                                'Expect:',
                         ],
                 ]
         );
@@ -232,22 +249,22 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
-     * Build HTTP body of request.
+     * Build the form fields of a group send.
      *
-     * @param $boundary
      * @param $authorhash
      * @param $cousereid
      * @param $assignmentid
      * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
-     * @param $content
+     * @param string|stored_file $content
      * @param $mime
      * @param $filename
-     * @return string
+     * @param array $filters
+     * @param string|null $coursename Course fullname, shown in service reports.
+     * @return array
      */
-    private function get_body_for_group(
-        $boundary,
+    private function get_fields_for_group(
         $authorhash,
         $cousereid,
         $assignmentid,
@@ -257,32 +274,25 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = []
+        $filters = [],
+        $coursename = null
     ) {
-        $eol = "\r\n";
+        $fields = array_merge($this->common_fields(), [
+            'token' => $this->token,
+            'hash' => $authorhash,
+            'course_id' => $cousereid,
+            'assignment_id' => $assignmentid,
+            'assignment_name' => $assignmentname,
+            'submission_id' => $submissionid,
+            'attachment_id' => $attachmentid,
+            'filename' => $filename,
+        ]);
 
-        $body = '';
-        $body .= $this->get_part('token', $this->token, $boundary);
-        $body .= $this->get_part('hash', $authorhash, $boundary);
-        $body .= $this->get_part('course_id', $cousereid, $boundary);
-        $body .= $this->get_part('assignment_id', $assignmentid, $boundary);
-        $body .= $this->get_part('assignment_name', $assignmentname, $boundary);
-        $body .= $this->get_part('submission_id', $submissionid, $boundary);
-        $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
-        $body .= $this->get_part('filename', $filename, $boundary);
-        $body .= $this->get_part('language', 'en', $boundary);
-        $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
-        $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
-        $body .= $this->get_part('lms', 'moodle', $boundary);
-        foreach ($filters as $filtername => $filtervalue) {
-            if ($filtervalue !== null) {
-                $body .= $this->get_part($filtername, $filtervalue, $boundary);
-            }
-        }
-        $body .= $this->get_file_part('content', $content, $mime, $filename, $boundary);
-        $body .= '--' . $boundary . '--' . $eol;
+        $fields = array_merge($fields, $this->course_name_field($coursename));
+        $fields = array_merge($fields, $this->filter_fields($filters));
+        $fields['content'] = $this->file_field($content, $mime, $filename);
 
-        return $body;
+        return $fields;
     }
 
     /**
@@ -294,11 +304,12 @@ class plagiarism_pchkorg_api_provider {
      * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
-     * @param $content
+     * @param string|stored_file $content
      * @param $mime
      * @param $filename
      * @param array $filters
      * @param string|null $email Email of the acting user, for group token auth.
+     * @param string|null $coursename Course fullname, shown in service reports.
      *
      * @return int|null
      */
@@ -312,15 +323,13 @@ class plagiarism_pchkorg_api_provider {
         $mime,
         $filename,
         $filters = [],
-        $email = null
+        $email = null,
+        $coursename = null
     ) {
-
-        $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
 
         $response = $this->transport->post(
             $this->endpoint . '/api/v1/text',
-            $this->get_body(
-                $boundary,
+            $this->get_fields(
                 $cousereid,
                 $assignmentid,
                 $assignmentname,
@@ -329,15 +338,17 @@ class plagiarism_pchkorg_api_provider {
                 $content,
                 $mime,
                 $filename,
-                $filters
+                $filters,
+                $coursename
             ),
             [
                         'CURLOPT_RETURNTRANSFER' => true,
                         'CURLOPT_TIMEOUT' => 50,
-                        'CURLOPT_POST' => true,
                         'CURLOPT_HTTPHEADER' => [
                                 'X-API-TOKEN: ' . $this->generate_api_token($email),
-                                'Content-Type: multipart/form-data; boundary=' . $boundary,
+                            // Content-Type is deliberately absent: curl sets it,
+                            // with the boundary it generated for the body.
+                                'Expect:',
                         ],
                 ]
         );
@@ -384,61 +395,121 @@ class plagiarism_pchkorg_api_provider {
     }
 
     /**
-     * Build part of HTTP body.
+     * Fields every send carries, whatever the token type.
      *
-     * @param $name
-     * @param $value
-     * @param $boundary
-     * @return string
+     * @return array
      */
-    private function get_part($name, $value, $boundary) {
-        $eol = "\r\n";
-
-        $part = '--' . $boundary . $eol;
-        $part .= 'Content-Disposition: form-data; name="' . $name . '"' . $eol . $eol;
-        $part .= $value . $eol;
-
-        return $part;
+    private function common_fields() {
+        return [
+            'language' => 'en',
+            'skip_english_words_validation' => '1',
+            'skip_percentage_words_validation' => '1',
+            'lms' => 'moodle',
+        ];
     }
 
     /**
-     * Build part of HTTP body. This part contains file.
+     * The course name as a form field, if there is one to send.
      *
-     * @param $name
-     * @param $value
-     * @param $mime
-     * @param $filename
-     * @param $boundary
-     * @return string
+     * Omitted from the request entirely when absent or blank, rather than sent
+     * empty: the service treats a missing course_name as "this site does not
+     * report one", which is exactly how every plugin release before this one
+     * reads to it.
+     *
+     * @param string|null $coursename
+     * @return array
      */
-    private function get_file_part($name, $value, $mime, $filename, $boundary) {
-        $eol = "\r\n";
+    private function course_name_field($coursename) {
+        if (null === $coursename) {
+            return [];
+        }
 
-        $part = '--' . $boundary . $eol;
-        $part .= 'Content-Disposition: form-data; name="' . $name . '"; filename="' . $filename . '";' . $eol;
-        $part .= 'Content-Type: ' . $mime . $eol;
-        $part .= 'Content-Length: ' . strlen($value) . $eol . $eol;
-        $part .= $value . $eol;
+        $coursename = trim($coursename);
+        if ('' === $coursename) {
+            return [];
+        }
 
-        return $part;
+        return ['course_name' => $coursename];
     }
 
     /**
-     * Build HTTP body of request.
+     * Search filters as form fields.
      *
-     * @param $boundary
+     * A null filter means "the activity does not say", which is not the same as
+     * saying no, so it is left out of the request entirely rather than sent as
+     * an empty field the service would have to interpret.
+     *
+     * @param array $filters
+     * @return array
+     */
+    private function filter_fields($filters) {
+        $fields = [];
+        foreach ($filters as $filtername => $filtervalue) {
+            if ($filtervalue !== null) {
+                $fields[$filtername] = $filtervalue;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * A file form field.
+     *
+     * curl uploads from a path, so what this returns is always a path plus the
+     * name and type to declare for it. Where the caller has a stored_file, that
+     * path is the file pool's own, and a submission is never read into PHP
+     * memory on its way to the service.
+     *
+     * Content the plugin holds only as a string -- online text, a forum post --
+     * has no pool file behind it and is spooled to a temporary one.
+     * make_request_directory() hands back a fresh directory per call, so two
+     * parts of the same request cannot collide, and Moodle removes it when the
+     * request ends; there is nothing to clean up here.
+     *
+     * The name on disk is never transmitted. What the service sees is the third
+     * argument, and on the personal-token path that filename is the only thing
+     * telling it which parser to use, so it is always passed explicitly rather
+     * than left to be inferred from the path.
+     *
+     * @param string|stored_file $content
+     * @param string $mime
+     * @param string $filename Name the service should see.
+     * @return CURLFile
+     */
+    private function file_field($content, $mime, $filename) {
+        if ($content instanceof stored_file) {
+            // Fetches a local copy first on a remote file system, which is what
+            // Moodle's own stored_file-to-curl integration does.
+            $path = get_file_storage()
+                ->get_file_system()
+                ->get_local_path_from_storedfile($content, true);
+
+            return curl_file_create($path, $mime, $filename);
+        }
+
+        $path = make_request_directory() . '/upload';
+        file_put_contents($path, $content);
+
+        return curl_file_create($path, $mime, $filename);
+    }
+
+    /**
+     * Build the form fields of a personal send.
+     *
      * @param $cousereid
      * @param $assignmentid
      * @param $assignmentname
      * @param $submissionid
      * @param $attachmentid
-     * @param $content
+     * @param string|stored_file $content
      * @param $mime
      * @param $filename
-     * @return string
+     * @param array $filters
+     * @param string|null $coursename Course fullname, shown in service reports.
+     * @return array
      */
-    private function get_body(
-        $boundary,
+    private function get_fields(
         $cousereid,
         $assignmentid,
         $assignmentname,
@@ -447,29 +518,24 @@ class plagiarism_pchkorg_api_provider {
         $content,
         $mime,
         $filename,
-        $filters = []
+        $filters = [],
+        $coursename = null
     ) {
-        $eol = "\r\n";
+        $fields = array_merge($this->common_fields(), [
+            'course_id' => $cousereid,
+            'assignment_id' => $assignmentid,
+            'assignment_name' => $assignmentname,
+            'submission_id' => $submissionid,
+            'attachment_id' => $attachmentid,
+        ]);
 
-        $body = '';
-        $body .= $this->get_part('language', 'en', $boundary);
-        $body .= $this->get_part('skip_english_words_validation', '1', $boundary);
-        $body .= $this->get_part('skip_percentage_words_validation', '1', $boundary);
-        $body .= $this->get_part('course_id', $cousereid, $boundary);
-        $body .= $this->get_part('assignment_id', $assignmentid, $boundary);
-        $body .= $this->get_part('assignment_name', $assignmentname, $boundary);
-        $body .= $this->get_part('submission_id', $submissionid, $boundary);
-        $body .= $this->get_part('attachment_id', $attachmentid, $boundary);
-        $body .= $this->get_part('lms', 'moodle', $boundary);
-        foreach ($filters as $filtername => $filtervalue) {
-            if ($filtervalue !== null) {
-                $body .= $this->get_part($filtername, $filtervalue, $boundary);
-            }
-        }
-        $body .= $this->get_file_part('text', $content, $mime, $filename, $boundary);
-        $body .= '--' . $boundary . '--' . $eol;
+        $fields = array_merge($fields, $this->course_name_field($coursename));
+        $fields = array_merge($fields, $this->filter_fields($filters));
+        // This endpoint takes no filename field: it reads the name off the part
+        // itself, which is why file_field() is always given one.
+        $fields['text'] = $this->file_field($content, $mime, $filename);
 
-        return $body;
+        return $fields;
     }
 
     /**
@@ -529,10 +595,8 @@ class plagiarism_pchkorg_api_provider {
             return $result;
         }
 
-        static $resultmap = [];
-
-        if (array_key_exists($email, $resultmap)) {
-            return $resultmap[$email];
+        if (array_key_exists($email, self::$membercache)) {
+            return self::$membercache[$email];
         }
 
         $response = $this->transport->post($this->endpoint . '/lms/moodle/is-group-member/', [
@@ -557,9 +621,23 @@ class plagiarism_pchkorg_api_provider {
             return $result;
         }
 
-        $resultmap[$email] = $result;
+        self::$membercache[$email] = $result;
 
         return $result;
+    }
+
+    /**
+     * Forget cached membership answers.
+     *
+     * The cache is process-wide and keyed by identity string, which is right for
+     * a web request and wrong for anything longer. Tests share one process, so
+     * one test's answer would otherwise be served to the next; cron runs long
+     * enough that a membership could change underneath it.
+     *
+     * @return void
+     */
+    public static function reset_caches() {
+        self::$membercache = [];
     }
 
     /**
@@ -597,19 +675,33 @@ class plagiarism_pchkorg_api_provider {
      * Auto registration is enabled for this university,
      *  so we registrate a user and user can check submissions.
      *
-     * @param $name
-     * @param $email
-     * @param $role
+     * The `email` field is the identity the service will know this person by,
+     * which on a course-scoped site is their namespaced Moodle username rather
+     * than an address. Their real address goes in `additional_email`, where the
+     * service treats it as somewhere to write to and never as an identifier.
+     * Omitted entirely when there is none, so an institution-wide site posts
+     * byte for byte what it always has.
+     *
+     * @param string $name
+     * @param string $login Identity to register under: an email, or a login.
+     * @param int $role
+     * @param string|null $additionalemail Delivery address, when the login is not one.
      *
      * @return bool
      */
-    public function auto_registrate_member($name, $email, $role) {
-        $response = $this->transport->post($this->endpoint . '/lms/moodle/auto-registration/', [
+    public function auto_registrate_member($name, $login, $role, $additionalemail = null) {
+        $fields = [
                 'token' => $this->token,
                 'name' => $name,
-                'email' => $email,
+                'email' => $login,
                 'role' => $role,
-        ], [
+        ];
+
+        if (!empty($additionalemail)) {
+            $fields['additional_email'] = $additionalemail;
+        }
+
+        $response = $this->transport->post($this->endpoint . '/lms/moodle/auto-registration/', $fields, [
                 'CURLOPT_RETURNTRANSFER' => true,
             // The maximum number of seconds to allow cURL functions to execute.
                 'CURLOPT_TIMEOUT' => 30,
@@ -620,6 +712,55 @@ class plagiarism_pchkorg_api_provider {
         }
 
         return false;
+    }
+
+    /**
+     * Tell the service that a member teaches one course.
+     *
+     * The service stores one role per member for the whole institution, which
+     * cannot describe somebody who teaches one course and studies in another.
+     * This records the missing per-course fact, and the service treats it as an
+     * extra way to allow a report, never as a reason to refuse one.
+     *
+     * Sent server to server, so nothing about the grant passes through a page
+     * the viewer could edit. Grants expire at the service after 48 hours and
+     * this is called afresh on every report open, so re-issuing one is the
+     * normal case rather than an error.
+     *
+     * @param string $email Email of the teacher, hashed before it is sent.
+     * @param int|string $courseid Moodle course id.
+     * @param int $role Service role id; only teacher is accepted.
+     *
+     * @return bool Whether the service recorded the grant.
+     */
+    public function grant_course_role($email, $courseid, $role) {
+        // A personal token has no members, so there is nobody to grant
+        // anything to and no group whose reports could be scoped.
+        if (!$this->is_group_token()) {
+            return false;
+        }
+
+        $response = $this->transport->post($this->endpoint . '/lms/moodle/course-role/', [
+                'token' => $this->token,
+                'hash' => $this->user_email_to_hash($email),
+                'course_id' => $courseid,
+                'role' => $role,
+        ], [
+                'CURLOPT_RETURNTRANSFER' => true,
+            // The maximum number of seconds to allow cURL functions to execute.
+                'CURLOPT_TIMEOUT' => 30,
+        ]);
+
+        if (false === $response || null === $response || '' === $response) {
+            return false;
+        }
+
+        $json = json_decode($response);
+        if (!is_object($json) || !property_exists($json, 'success')) {
+            return false;
+        }
+
+        return (bool) $json->success;
     }
 
     /**
@@ -789,17 +930,36 @@ class plagiarism_pchkorg_api_provider {
     /**
      * Check the configured token against the service.
      *
-     * Called only when plugin settings are saved. The three outcomes are kept
-     * apart on purpose: an unreachable service must not be reported to the
-     * administrator as an invalid token.
+     * Called when plugin settings are saved, and again whenever the settings
+     * page renders, so the administrator sees the state of the account as it is
+     * now rather than as it was when the token was pasted in. Nowhere else: not
+     * per submission, not per activity edit, not from scheduled tasks.
      *
-     * @return object With ok (bool), reachable (bool) and group (object|null).
+     * The three reachable outcomes are kept apart on purpose: an unreachable
+     * service must not be reported to the administrator as an invalid token.
+     *
+     * @return object With checked (bool), ok (bool), reachable (bool) and
+     *                 group (plagiarism_pchkorg_group_info|null). When checked
+     *                 is false nothing was asked and the rest mean nothing.
      */
     public function validate_token() {
         $result = new \stdClass();
+        $result->checked = true;
         $result->ok = false;
         $result->reachable = true;
         $result->group = null;
+
+        // This endpoint resolves institutional tokens only, so a personal token
+        // would come back rejected and the administrator would be told a
+        // working token is broken. Nothing is asked for one instead. The cost
+        // is that a genuinely mistyped personal token is no longer caught here;
+        // it surfaces on the first submission, as it did before any validation
+        // existed.
+        if (!$this->is_group_token()) {
+            $result->checked = false;
+
+            return $result;
+        }
 
         $response = $this->transport->post($this->endpoint . '/lms/moodle/token/validate/', [
             'token' => $this->token,
@@ -824,7 +984,7 @@ class plagiarism_pchkorg_api_provider {
         if (isset($json->success) && $json->success) {
             $result->ok = true;
             if (isset($json->data->group)) {
-                $result->group = $json->data->group;
+                $result->group = plagiarism_pchkorg_group_info::from_response($json->data->group);
             }
         }
 
@@ -916,45 +1076,45 @@ class plagiarism_pchkorg_api_provider {
      * Apply deletions, uploads and pasted text in one save.
      *
      * @param string $assignmentkey
-     * @param array $files Each an array with filename, mime and content keys.
+     * @param array $files Each an array with filename, mime and content keys,
+     *                      where content is a stored_file or the raw bytes.
      * @param string $text Pasted template text, or empty.
      * @param array $deleteids Template ids to remove.
      * @param string $email
      * @return bool True on success; on failure see get_last_error().
      */
     public function ignore_template_save($assignmentkey, array $files, $text, array $deleteids, $email) {
-        $boundary = sprintf('PLAGCHECKBOUNDARY-%s', uniqid(time()));
-        $eol = "\r\n";
-
-        $body = '';
-        $body .= $this->get_part('token', $this->token, $boundary);
-        $body .= $this->get_part('hash', $this->user_email_to_hash($email), $boundary);
-        $body .= $this->get_part('assignment_key', $assignmentkey, $boundary);
+        $fields = [
+            'token' => $this->token,
+            'hash' => $this->user_email_to_hash($email),
+            'assignment_key' => $assignmentkey,
+        ];
         if ('' !== trim((string) $text)) {
-            $body .= $this->get_part('template_text', $text, $boundary);
+            $fields['template_text'] = $text;
         }
+        // The bracketed names are literal field names, not PHP arrays: curl
+        // sends them as written and PHP reassembles the arrays on the far side.
         foreach (array_values($deleteids) as $index => $deleteid) {
-            $body .= $this->get_part(sprintf('delete[%d]', $index), (int) $deleteid, $boundary);
+            $fields[sprintf('delete[%d]', $index)] = (int) $deleteid;
         }
         foreach (array_values($files) as $index => $file) {
-            $body .= $this->get_file_part(
-                sprintf('templates[%d]', $index),
+            $fields[sprintf('templates[%d]', $index)] = $this->file_field(
                 $file['content'],
                 $file['mime'],
-                $file['filename'],
-                $boundary
+                $file['filename']
             );
         }
-        $body .= '--' . $boundary . '--' . $eol;
 
         $response = $this->transport->post(
             $this->endpoint . '/lms/moodle/assignment/ignore-templates/save/',
-            $body,
+            $fields,
             [
                 'CURLOPT_RETURNTRANSFER' => true,
                 'CURLOPT_TIMEOUT' => 120,
+                // Content-Type is deliberately absent: curl sets it, with the
+                // boundary it generated for the body.
                 'CURLOPT_HTTPHEADER' => [
-                    'Content-Type: multipart/form-data; boundary=' . $boundary,
+                    'Expect:',
                 ],
             ]
         );

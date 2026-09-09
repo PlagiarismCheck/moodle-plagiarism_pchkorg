@@ -96,6 +96,56 @@ After a student submits work, Moodle queues it for processing. A similarity
 score, an AI score when enabled, and a report link appear after the scheduled
 tasks receive the result from PlagiarismCheck.org.
 
+### Who can open which reports
+
+By default, PlagiarismCheck.org stores one role per person for your whole
+institution. Anyone registered as a teacher can therefore open every report the
+institution holds, including reports from courses they have nothing to do with.
+That is fine for many institutions and awkward for any where the same person
+teaches one course and studies in another.
+
+**Limit report access to a teacher's own courses**, in the plugin's site
+settings, changes this. It ships switched off; until an administrator turns it
+on, nothing about the plugin's behaviour differs.
+
+With it on, a teacher is given access to a course as they open a report in it.
+They keep full access to every course they teach and can no longer open reports
+from courses they do not. Students are unaffected either way: a student reaches
+their own report because it is theirs, which is how it already worked.
+
+Four things are worth knowing before turning it on:
+
+- **It applies to people registered from then on.** Anyone already registered
+  with PlagiarismCheck.org as a teacher keeps institution-wide access until
+  PlagiarismCheck.org support changes their role. A long-running site will see
+  little change until its membership turns over; contact support if you need
+  existing teachers converted.
+- **Access to a course lasts 48 hours** and is renewed every time that teacher
+  opens a report from the course. Somebody who stops teaching a course loses
+  access to it within two days, with nobody having to revoke anything.
+- **Older and non-Moodle reports are not affected.** Submissions made before
+  your site recorded course information, and anything submitted to
+  PlagiarismCheck.org outside Moodle, are still governed by the
+  institution-wide role.
+- **It changes what a person is called at PlagiarismCheck.org.** Teachers and
+  students registered from now on are identified by their Moodle username
+  rather than their email address, so a teacher who already has a personal
+  PlagiarismCheck.org account, or two people sharing an address, no longer
+  collide with one another. Their email address is still sent to
+  PlagiarismCheck.org and is where it writes to them. Anyone already registered
+  under their email address goes on being recognised by it. Turning the option
+  off again is not symmetric: identity reverts to the email address, and a
+  teacher registered only under a username is registered again under their
+  address.
+
+Opening a report makes one extra call to PlagiarismCheck.org, so a teacher whose
+connection to the service is slow will notice reports taking marginally longer
+to open. If that call fails, the report is not opened and the teacher is asked
+to try again, rather than being sent on to an error they cannot interpret.
+
+This feature needs a PlagiarismCheck.org service release that supports
+per-course access; contact support if the setting appears to have no effect.
+
 ### Ignored activity templates
 
 An administrator can enable **activity template exclusion**, which requires an

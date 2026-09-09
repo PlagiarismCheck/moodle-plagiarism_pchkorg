@@ -130,6 +130,15 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         );
         $mform->setDefault('pchkorg_teacher_auto_registration', '0');
 
+        $mform->addElement(
+            'select',
+            'pchkorg_course_access',
+            get_string('pchkorg:courseaccess', 'plagiarism_pchkorg'),
+            [get_string('no'), get_string('yes')]
+        );
+        $mform->addHelpButton('pchkorg_course_access', 'pchkorg:courseaccess', 'plagiarism_pchkorg');
+        $mform->setDefault('pchkorg_course_access', '0');
+
         $this->add_action_buttons(true);
     }
 }

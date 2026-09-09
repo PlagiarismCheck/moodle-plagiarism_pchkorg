@@ -84,13 +84,34 @@ if (plagiarism_pchkorg_roles::is_student($context, $USER->id)) {
 $apitoken = $configmodel->get_system_config('pchkorg_token');
 $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
 
+// Who this viewer is to the service. Resolved once and used for all three calls
+// below: the membership check, the course grant and the report credential all
+// hash the identity, and a viewer looked up under one string but handed a
+// credential built from another would be refused at the far end.
+$servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $USER, $configmodel);
+
 // A group account only recognises its own members.
-if (!$apiprovider->is_group_member($USER->email)) {
+if (!$servicelogin->member->is_member) {
     throw new moodle_exception('pchkorg_report_not_allowed', 'plagiarism_pchkorg');
 }
 
+// On a course-scoped site a teacher's rights over this course live on the
+// service as a grant, and it is written here rather than kept in step by a
+// sync: Moodle has just decided this viewer may open this report, so that is
+// the moment to say so. Does nothing on a site using institution-wide access.
+$hasaccess = plagiarism_pchkorg_course_access::ensure_report_access(
+    $apiprovider,
+    $context,
+    $cm->course,
+    $servicelogin->login,
+    $configmodel
+);
+if (!$hasaccess) {
+    throw new moodle_exception('pchkorg_report_access_unavailable', 'plagiarism_pchkorg');
+}
+
 $action = $apiprovider->get_report_action($filerecord->textid);
-$token = $apiprovider->generate_api_token($USER->email);
+$token = $apiprovider->generate_api_token($servicelogin->login);
 
 // The service expects the credential as a POST field, so hand over with a
 // self-submitting form rather than a redirect.

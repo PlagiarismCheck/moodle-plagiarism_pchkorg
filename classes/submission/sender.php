@@ -57,6 +57,9 @@ class plagiarism_pchkorg_sender {
     /** @var array Filters per course module id, built once per run. */
     private $filtercache = [];
 
+    /** @var array Course fullname per course id, looked up once per run. */
+    private $coursenamecache = [];
+
     /**
      * Build a sender.
      *
@@ -117,8 +120,18 @@ class plagiarism_pchkorg_sender {
             return $this->result(self::RESULT_RETRY);
         }
 
+        // The author hash and the acting identity are the same string, and it is
+        // whatever the service knows this person by -- a namespaced username on a
+        // course-scoped site. A submission hashed under an identity the service
+        // has no member for is attributed to nobody.
+        $login = plagiarism_pchkorg_service_login::resolve(
+            $this->apiprovider,
+            $user,
+            $this->configmodel
+        )->login;
+
         $textid = $this->apiprovider->general_send_check(
-            $this->apiprovider->user_email_to_hash($user->email),
+            $this->apiprovider->user_email_to_hash($login),
             $cm->course,
             $cm->id,
             $cm->name,
@@ -128,7 +141,8 @@ class plagiarism_pchkorg_sender {
             $payload->mime,
             $payload->filename,
             $this->filters_for($cm),
-            $user->email
+            $login,
+            $this->course_name_for($cm->course)
         );
 
         if (!$textid) {
@@ -136,6 +150,39 @@ class plagiarism_pchkorg_sender {
         }
 
         return $this->result(self::RESULT_SENT, $textid);
+    }
+
+    /**
+     * The fullname of a course, or null if it cannot be read.
+     *
+     * get_course() is served from Moodle's course cache, so this is cheap, but
+     * a run sends many submissions of the same course and there is no reason to
+     * ask more than once.
+     *
+     * A course that cannot be loaded answers null rather than throwing: the
+     * name is a label on the check, and the check is worth more than the label.
+     *
+     * @param int $courseid
+     * @return string|null
+     */
+    private function course_name_for($courseid) {
+        if (array_key_exists($courseid, $this->coursenamecache)) {
+            return $this->coursenamecache[$courseid];
+        }
+
+        $coursename = null;
+        try {
+            $course = get_course($courseid);
+            if (is_object($course) && isset($course->fullname)) {
+                $coursename = (string) $course->fullname;
+            }
+        } catch (\Exception $e) {
+            $coursename = null;
+        }
+
+        $this->coursenamecache[$courseid] = $coursename;
+
+        return $coursename;
     }
 
     /**

@@ -33,6 +33,75 @@ require_once(__DIR__ . '/fixtures/fake_transport.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class api_transport_test extends \basic_testcase {
+    protected function setUp(): void {
+        parent::setUp();
+        \plagiarism_pchkorg_api_provider::reset_caches();
+    }
+
+    /**
+     * A registration under an LMS login carries the address beside it.
+     *
+     * `email` is the identity the service will store, and on a course-scoped
+     * site that is a username. The real address goes in `additional_email`,
+     * where the service treats it as somewhere to write and never as a way to
+     * find anybody.
+     */
+    public function test_registration_posts_the_additional_email(): void {
+        $transport = $this->transport([json_encode(['success' => true])]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $result = $provider->auto_registrate_member(
+            'Jane Smith',
+            'moodle-7f3a91c2b4d1-jsmith',
+            3,
+            'j.smith@example.edu'
+        );
+
+        $this->assertTrue($result);
+        $params = $transport->request(0)['params'];
+        $this->assertSame('moodle-7f3a91c2b4d1-jsmith', $params['email']);
+        $this->assertSame('j.smith@example.edu', $params['additional_email']);
+        $this->assertSame(3, $params['role']);
+    }
+
+    /**
+     * With no address to send, the field is absent rather than empty.
+     *
+     * An institution-wide site must post exactly the fields it always has, so
+     * the parameter is omitted entirely rather than sent as null or ''.
+     */
+    public function test_registration_omits_an_absent_additional_email(): void {
+        $transport = $this->transport([json_encode(['success' => true])]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->auto_registrate_member('John Doe', 'john.doe@example.com', 2);
+
+        $params = $transport->request(0)['params'];
+        $this->assertSame('john.doe@example.com', $params['email']);
+        $this->assertArrayNotHasKey('additional_email', $params);
+    }
+
+    /**
+     * The membership hash is taken over whatever identity it is given.
+     *
+     * The service recomputes it as sha256(token . identity), so a login hashes
+     * exactly as an address does and nothing about the shape is special-cased.
+     */
+    public function test_membership_hash_is_built_from_the_identity(): void {
+        $transport = $this->transport([
+            json_encode(['success' => true, 'is_member' => true, 'is_auto_registration_enabled' => false]),
+        ]);
+        $provider = $this->provider('G-group-token', $transport);
+        $login = 'moodle-7f3a91c2b4d1-jsmith';
+
+        $provider->is_group_member($login);
+
+        $this->assertSame(
+            hash('sha256', 'G-group-token' . $login),
+            $transport->request(0)['params']['hash']
+        );
+    }
+
     /**
      * A group token routes to the Moodle LMS endpoint and carries the token in
      * the multipart body, which is what the service authenticates on.
@@ -61,8 +130,8 @@ class api_transport_test extends \basic_testcase {
         $request = $transport->request();
         $this->assertSame('POST', $request['method']);
         $this->assertSame('https://service.example/lms/moodle/check-text/', $request['url']);
-        $this->assertContains('token', $this->body_field_names($request['params']));
-        $this->assertContains('hash', $this->body_field_names($request['params']));
+        $this->assertArrayHasKey('token', $request['params']);
+        $this->assertArrayHasKey('hash', $request['params']);
     }
 
     /**
@@ -89,6 +158,102 @@ class api_transport_test extends \basic_testcase {
             'https://service.example/api/v1/text',
             $transport->request()['url']
         );
+    }
+
+    /**
+     * The course name rides along on both send paths, so reports on the service
+     * name the course rather than showing its number.
+     */
+    public function test_group_send_carries_the_course_name(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            'student@example.com',
+            'Introduction to Biology'
+        );
+
+        $this->assertSame('Introduction to Biology', $transport->request()['params']['course_name']);
+    }
+
+    public function test_personal_send_carries_the_course_name(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('personal-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            null,
+            'Introduction to Biology'
+        );
+
+        $this->assertSame('Introduction to Biology', $transport->request()['params']['course_name']);
+    }
+
+    /**
+     * A course whose name could not be read sends no field at all rather than
+     * an empty one, which is how every release before this one reads to the
+     * service.
+     */
+    public function test_send_omits_the_course_name_when_there_is_none(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            'student@example.com'
+        );
+
+        $this->assertArrayNotHasKey('course_name', $transport->request()['params']);
+    }
+
+    public function test_send_omits_a_blank_course_name(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            'student@example.com',
+            '   '
+        );
+
+        $this->assertArrayNotHasKey('course_name', $transport->request()['params']);
     }
 
     /**
@@ -141,9 +306,110 @@ class api_transport_test extends \basic_testcase {
             ['source_min_percent' => 15, 'exclude_self_plagiarism' => null]
         );
 
-        $names = $this->body_field_names($transport->request()['params']);
-        $this->assertContains('source_min_percent', $names);
-        $this->assertNotContains('exclude_self_plagiarism', $names);
+        $params = $transport->request()['params'];
+        $this->assertArrayHasKey('source_min_percent', $params);
+        $this->assertArrayNotHasKey('exclude_self_plagiarism', $params);
+    }
+
+    /**
+     * The personal endpoint carries no filename field: it reads the name off
+     * the uploaded part itself, and picks its parser from the extension. A
+     * CURLFile built without a posted filename would not fail — the document
+     * would simply be parsed as the wrong format — so this is asserted rather
+     * than left to the next person to notice.
+     */
+    public function test_personal_send_names_the_uploaded_part(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('personal-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'application/pdf',
+            'essay.pdf'
+        );
+
+        $params = $transport->request()['params'];
+        $this->assertArrayNotHasKey('filename', $params);
+        $this->assertInstanceOf('CURLFile', $params['text']);
+        $this->assertSame('essay.pdf', $params['text']->getPostFilename());
+        $this->assertSame('application/pdf', $params['text']->getMimeType());
+        $this->assertSame('the text', file_get_contents($params['text']->getFilename()));
+    }
+
+    /**
+     * The group endpoint sends the name as a field as well, and the service
+     * reads that one; the part is still named, so both agree.
+     */
+    public function test_group_send_names_the_uploaded_part(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'essay.txt',
+            [],
+            'student@example.com'
+        );
+
+        $params = $transport->request()['params'];
+        $this->assertSame('essay.txt', $params['filename']);
+        $this->assertInstanceOf('CURLFile', $params['content']);
+        $this->assertSame('essay.txt', $params['content']->getPostFilename());
+    }
+
+    /**
+     * curl builds the multipart body now, so it owns the boundary and the
+     * Content-Type that declares it. Setting our own header would leave the
+     * two disagreeing and every send failing, which is why its absence is
+     * pinned here rather than assumed.
+     */
+    public function test_sends_leave_content_type_to_curl(): void {
+        $sends = [
+            'personal' => 'personal-token',
+            'group' => 'G-group-token',
+        ];
+
+        foreach ($sends as $label => $token) {
+            $transport = $this->transport([$this->send_success(1)]);
+            $provider = $this->provider($token, $transport);
+
+            $provider->general_send_check(
+                'author-hash',
+                7,
+                11,
+                'Essay 1',
+                21,
+                31,
+                'the text',
+                'text/plain',
+                'x.txt',
+                [],
+                'student@example.com'
+            );
+
+            $headers = $transport->request_headers();
+            foreach ($headers as $header) {
+                $this->assertStringNotContainsString('Content-Type', $header, $label);
+            }
+
+            // Suppressing 100-continue: curl would otherwise wait for an
+            // interim response before sending the document, which some proxies
+            // never return.
+            $this->assertContains('Expect:', $headers, $label);
+        }
     }
 
     /**
@@ -420,18 +686,5 @@ class api_transport_test extends \basic_testcase {
             'success' => true,
             'data' => ['text' => ['id' => $textid]],
         ]);
-    }
-
-    /**
-     * Extract the form field names from a hand-built multipart body.
-     *
-     * @param string $body
-     * @return array
-     */
-    private function body_field_names($body) {
-        $matches = [];
-        preg_match_all('/name="([^"]+)"/', $body, $matches);
-
-        return $matches[1];
     }
 }

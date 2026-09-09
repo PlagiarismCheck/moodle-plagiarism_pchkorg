@@ -35,6 +35,7 @@ require_once(__DIR__ . '/classes/assignment_key.php');
 require_once(__DIR__ . '/classes/ignore_template_form.php');
 require_once(__DIR__ . '/classes/refresh_results_form.php');
 require_once(__DIR__ . '/classes/roles.php');
+require_once(__DIR__ . '/classes/course_access.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_config_model.php');
 require_once(__DIR__ . '/classes/plagiarism_pchkorg_api_provider.php');
 require_once(__DIR__ . '/classes/submission/sender.php');
@@ -623,7 +624,8 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
         // Also, there is timeout 8 seconds for response.
         // Even if service will be unavailable, method will try call API only once.
         // Also, we don't use raw user email.
-        $ismemberresponse = $apiprovider->get_group_member_response($USER->email);
+        $servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $USER, $pchkorgconfigmodel);
+        $ismemberresponse = $servicelogin->member;
         if (!$ismemberresponse->is_member) {
             // Deny in both cases: a confirmed non-member, and an unknown
             // answer (service unreachable). Failing open on "unknown" would
@@ -1022,7 +1024,8 @@ display: inline-block;"
         // Also, there is timeout 8 seconds for response.
         // Even if service is unavailable, method will try call only once.
         // Also, we don't use raw users email.
-        $ismemberresponse = $apiprovider->get_group_member_response($USER->email);
+        $servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $USER, $pchkorgconfigmodel);
+        $ismemberresponse = $servicelogin->member;
         $ismember = true;
         if (!$ismemberresponse->is_known) {
             // The service could not be reached or answered with something we
@@ -1036,7 +1039,15 @@ display: inline-block;"
                 $name = $USER->firstname . ' ' . $USER->lastname;
                 // Moodle has multiple roles in courses.
                 $isstudent = plagiarism_pchkorg_roles::is_student($context, $USER->id);
-                $isregistered = $apiprovider->auto_registrate_member($name, $USER->email, $isstudent ? 3 : 2);
+                // Registered under whichever identity the lookup just failed to
+                // find them by, so the account created here is the one the next
+                // membership check will look for.
+                $isregistered = $apiprovider->auto_registrate_member(
+                    $name,
+                    $servicelogin->login,
+                    $isstudent ? 3 : 2,
+                    plagiarism_pchkorg_service_login::additional_email($USER, $servicelogin->login)
+                );
                 if (!$isregistered) {
                     $ismember = false;
                 }
@@ -1378,6 +1389,12 @@ display: inline-block;"
     public function cron_auto_registrate_teachers($apiprovider = null) {
         global $DB;
 
+        // Cron shares one process across runs, so a resolution cached for a
+        // previous run's user would still be here. A web request is short enough
+        // for these caches to be safe; this is not.
+        plagiarism_pchkorg_service_login::reset_cache();
+        plagiarism_pchkorg_api_provider::reset_caches();
+
         $configmodel = new plagiarism_pchkorg_config_model();
         $enabled = $configmodel->get_system_config('pchkorg_use');
         $isdebugenabled = $configmodel->get_system_config('pchkorg_enable_debug') === '1';
@@ -1424,7 +1441,23 @@ display: inline-block;"
         );
         $namesql = $DB->sql_concat('u.firstname', "' '", 'u.lastname');
 
-        $sql = "SELECT DISTINCT u.id, u.email, {$namesql} AS name
+        // On a course-scoped site a teacher is bookkept under their namespaced
+        // login, so the "already handled" guard has to recognise both strings or
+        // turning the setting on would re-register every teacher on the site.
+        //
+        // The prefix is inlined as a literal rather than bound: sql_concat()
+        // builds an expression, and Postgres cannot infer the type of a
+        // placeholder inside one, so a bound parameter fails there.
+        $handledsql = 'pu.email = u.email';
+        if (plagiarism_pchkorg_course_access::is_course_scoped($configmodel)) {
+            $loginsql = $DB->sql_concat(
+                "'" . plagiarism_pchkorg_service_login::site_prefix() . "'",
+                'u.username'
+            );
+            $handledsql .= " OR pu.email = {$loginsql}";
+        }
+
+        $sql = "SELECT DISTINCT u.id, u.email, u.username, {$namesql} AS name
                   FROM {user} u
                   JOIN {user_enrolments} ue ON ue.userid = u.id
                   JOIN {enrol} e ON e.id = ue.enrolid
@@ -1448,7 +1481,7 @@ display: inline-block;"
                    AND NOT EXISTS (
                        SELECT 1
                          FROM {plagiarism_pchkorg_users} pu
-                        WHERE pu.email = u.email
+                        WHERE {$handledsql}
                    )
               ORDER BY u.id";
 
@@ -1460,15 +1493,21 @@ display: inline-block;"
         ]);
 
         $records = $DB->get_records_sql($sql, $params, 0, 50);
+        $iscoursescoped = plagiarism_pchkorg_course_access::is_course_scoped($configmodel);
         foreach ($records as $record) {
-            // Small email validation.
-            if (\strpos($record->email, '@') === false) {
+            // What makes a teacher registerable depends on what identifies them.
+            // On a course-scoped site that is their username, so a junk address
+            // is no longer a reason to skip them -- they simply get no delivery
+            // address. Everywhere else the address is the identity and still has
+            // to look like one.
+            if ($iscoursescoped ? empty($record->username) : \strpos($record->email, '@') === false) {
                 if ($isdebugenabled) {
                     echo 'cron_auto_registrate_teachers: Email format is invalid.';
                 }
                 continue;
             }
-            $member = $apiprovider->get_group_member_response($record->email);
+            $servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $record, $configmodel);
+            $member = $servicelogin->member;
             if (!$member->is_known) {
                 // The service could not be reached or answered with
                 // something we could not parse. We do not know whether
@@ -1492,18 +1531,31 @@ display: inline-block;"
                 $configmodel->set_system_config('pchkorg_teacher_auto_registration', '0');
                 return false;
             }
-            // User is already registered.
+            // User is already registered. The bookkeeping row records the
+            // identifier actually used, not always the address: it is what the
+            // NOT EXISTS guard above matches on, so storing the wrong one of the
+            // two would bring this teacher back on the next run forever.
             if ($member->is_member) {
                 $insertdata = new \stdClass();
-                $insertdata->email = $record->email;
+                $insertdata->email = $servicelogin->login;
                 $DB->insert_record('plagiarism_pchkorg_users', $insertdata);
             } else {
-                // Send API request for registration. Number 2 mean role teacher.
-                $success = $apiprovider->auto_registrate_member($record->name, $record->email, 2);
+                // Which role a teacher is registered under depends on how this
+                // site scopes report access. On an institution-wide site they
+                // are registered as a teacher, as they always have been. On a
+                // course-scoped site they are registered as a student, so that
+                // the per-course grants written when they open a report are the
+                // only thing carrying their teaching rights.
+                $success = $apiprovider->auto_registrate_member(
+                    $record->name,
+                    $servicelogin->login,
+                    plagiarism_pchkorg_course_access::registration_role($configmodel),
+                    plagiarism_pchkorg_service_login::additional_email($record, $servicelogin->login)
+                );
                 // Operation is successful.
                 if ($success) {
                     $insertdata = new \stdClass();
-                    $insertdata->email = $record->email;
+                    $insertdata->email = $servicelogin->login;
                     $DB->insert_record('plagiarism_pchkorg_users', $insertdata);
                 }
             }
@@ -1557,7 +1609,7 @@ display: inline-block;"
         $users = $DB->get_records_list('user', 'id', $userids);
 
         // The agreement is site-wide, so it is settled once for the whole run.
-        $this->accept_agreement_once($apiprovider, $users);
+        $this->accept_agreement_once($apiprovider, $users, $pchkorgconfigmodel);
 
         $sender = new plagiarism_pchkorg_sender($apiprovider, $pchkorgconfigmodel);
 
@@ -1584,10 +1636,11 @@ display: inline-block;"
      * Tell the service the agreement was accepted, once per site.
      *
      * @param plagiarism_pchkorg_api_provider $apiprovider
-     * @param array $users Users in the current batch, for the acting email.
+     * @param array $users Users in the current batch, for the acting identity.
+     * @param plagiarism_pchkorg_config_model|null $configmodel Injected by tests.
      * @return void
      */
-    private function accept_agreement_once($apiprovider, array $users) {
+    private function accept_agreement_once($apiprovider, array $users, $configmodel = null) {
         global $DB;
 
         $agreementwhere = [
@@ -1604,7 +1657,8 @@ display: inline-block;"
             return;
         }
 
-        $apiprovider->save_accepted_agreement($user->email);
+        $servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $user, $configmodel);
+        $apiprovider->save_accepted_agreement($servicelogin->login);
         $DB->insert_record('plagiarism_pchkorg_config', $agreementwhere);
     }
 

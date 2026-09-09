@@ -54,8 +54,8 @@ class plagiarism_pchkorg_ignore_template_download {
      *
      * @param stdClass $cm Course module the template must belong to.
      * @param int $templateid
-     * @param stdClass $user User doing the download; their email identifies
-     *                        them to the service.
+     * @param stdClass $user User doing the download; their service login
+     *                        identifies them to the service.
      * @param plagiarism_pchkorg_config_model|null $configmodel
      * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests.
      * @return stdClass With filename, mime and content.
@@ -80,10 +80,14 @@ class plagiarism_pchkorg_ignore_template_download {
 
         $key = plagiarism_pchkorg_assignment_key::for_cmid($cm->id);
 
+        // Both calls below must name the same identity, and it is whatever the
+        // service knows this teacher by rather than their address.
+        $login = plagiarism_pchkorg_service_login::resolve($apiprovider, $user, $configmodel)->login;
+
         // The service is the authority on which template belongs to this
         // activity; it answers 404 for one that belongs to another. The list is
         // only read for the name and type to send the file under.
-        $templates = $apiprovider->ignore_template_list($key, $user->email);
+        $templates = $apiprovider->ignore_template_list($key, $login);
 
         $result = new stdClass();
         $result->filename = null;
@@ -104,7 +108,7 @@ class plagiarism_pchkorg_ignore_template_download {
             }
         }
 
-        $result->content = $apiprovider->ignore_template_download($key, $templateid, $user->email);
+        $result->content = $apiprovider->ignore_template_download($key, $templateid, $login);
 
         if (null === $result->content) {
             $code = $apiprovider->get_last_error();
