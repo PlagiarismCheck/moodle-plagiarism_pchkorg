@@ -257,6 +257,84 @@ class api_transport_test extends \basic_testcase {
     }
 
     /**
+     * A group submission carries its identity, which the service's inner check
+     * indexes and excludes the group's files under.
+     */
+    public function test_group_send_carries_the_inner_check_key(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            'student@example.com',
+            'Introduction to Biology',
+            'moodle-0123456789ab-cm11-g5'
+        );
+
+        $this->assertSame('moodle-0123456789ab-cm11-g5', $transport->request()['params']['inner_check_key']);
+    }
+
+    /**
+     * A personal token has no organization, so no inner check: the key is not sent.
+     */
+    public function test_personal_send_never_carries_the_inner_check_key(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('personal-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            null,
+            'Introduction to Biology',
+            'moodle-0123456789ab-cm11-g5'
+        );
+
+        $this->assertArrayNotHasKey('inner_check_key', $transport->request()['params']);
+    }
+
+    /**
+     * An individual submission has no key, and its send stays what it always was.
+     */
+    public function test_send_omits_the_inner_check_key_when_there_is_none(): void {
+        $transport = $this->transport([$this->send_success(1)]);
+        $provider = $this->provider('G-group-token', $transport);
+
+        $provider->general_send_check(
+            'author-hash',
+            7,
+            11,
+            'Essay 1',
+            21,
+            31,
+            'the text',
+            'text/plain',
+            'x.txt',
+            [],
+            'student@example.com',
+            'Introduction to Biology'
+        );
+
+        $this->assertArrayNotHasKey('inner_check_key', $transport->request()['params']);
+    }
+
+    /**
      * The group auth header binds the token to the acting user, and callers
      * outside that user's session must be able to say who that is. In cron
      * $USER is the cron user, not the submitting student.

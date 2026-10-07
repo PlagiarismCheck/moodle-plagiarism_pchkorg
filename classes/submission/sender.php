@@ -142,7 +142,8 @@ class plagiarism_pchkorg_sender {
             $payload->filename,
             $this->filters_for($cm),
             $login,
-            $this->course_name_for($cm->course)
+            $this->course_name_for($cm->course),
+            $payload->innercheckkey
         );
 
         if (!$textid) {

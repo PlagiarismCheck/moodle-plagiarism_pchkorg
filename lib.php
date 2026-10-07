@@ -31,6 +31,7 @@ require_once($CFG->dirroot . '/plagiarism/lib.php');
 require_once($CFG->libdir . '/filelib.php');
 require_once($CFG->libdir . '/accesslib.php');
 require_once(__DIR__ . '/classes/state.php');
+require_once(__DIR__ . '/classes/group_submission.php');
 require_once(__DIR__ . '/classes/assignment_key.php');
 require_once(__DIR__ . '/classes/ignore_template_form.php');
 require_once(__DIR__ . '/classes/refresh_results_form.php');
@@ -1019,51 +1020,16 @@ display: inline-block;"
             return true;
         }
 
-        // Only for some type of account, method will call a remote HTTP API.
-        // The API will be called only once, because result is static.
-        // Also, there is timeout 8 seconds for response.
-        // Even if service is unavailable, method will try call only once.
-        // Also, we don't use raw users email.
-        $servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $USER, $pchkorgconfigmodel);
-        $ismemberresponse = $servicelogin->member;
-        $ismember = true;
-        if (!$ismemberresponse->is_known) {
-            // The service could not be reached or answered with something we
-            // could not parse. We don't know whether this user is a member,
-            // so queue the submission rather than fail it outright: the send
-            // step retries on transient failures and can reject it later
-            // with a concrete reason if the user genuinely is not a member.
-            $ismember = true;
-        } else if (!$ismemberresponse->is_member) {
-            if ($ismemberresponse->is_auto_registration_enabled) {
-                $name = $USER->firstname . ' ' . $USER->lastname;
-                // Moodle has multiple roles in courses.
-                $isstudent = plagiarism_pchkorg_roles::is_student($context, $USER->id);
-                // Registered under whichever identity the lookup just failed to
-                // find them by, so the account created here is the one the next
-                // membership check will look for.
-                $isregistered = $apiprovider->auto_registrate_member(
-                    $name,
-                    $servicelogin->login,
-                    $isstudent ? 3 : 2,
-                    plagiarism_pchkorg_service_login::additional_email($USER, $servicelogin->login)
-                );
-                if (!$isregistered) {
-                    $ismember = false;
-                }
-            } else {
-                $ismember = false;
-            }
-        }
+        $ismember = $this->is_member_or_registered($apiprovider, $USER, $context, $pchkorgconfigmodel);
 
         // Set the author and submitter.
         $submitter = $eventdata['userid'];
 
-        // Related user ID is NULL when an instructor submits on behalf of a student in a
-        // group. The intent was to look the group up and attribute the submission to one of
-        // its students, but that was never finished: the record was fetched and discarded,
-        // and the helper meant to pick the author was unreachable. Such submissions are
-        // therefore attributed to the submitting instructor.
+        // A group assignment submission is credited to whoever uploaded each file, and
+        // its online text to whoever saved it, so a file an instructor uploads on behalf
+        // of a group is attributed to that instructor, as Moodle itself records it.
+        $isgroupsubmission = $eventdata['other']['modulename'] === 'assign'
+            && plagiarism_pchkorg_group_submission::is_group_submission($eventdata['objectid']);
 
         if (
             $eventdata['other']['modulename'] === 'forum'
@@ -1263,8 +1229,6 @@ display: inline-block;"
             && $eventdata['eventtype'] === 'assessable_submitted'
         ) {
             // Get content.
-            $moodlesubmission = $DB->get_record('assign_submission', ['id' => $eventdata['objectid']], 'id');
-
             $moodletextsubmission = $DB->get_record(
                 'assignsubmission_onlinetext',
                 ['submission' => $eventdata['objectid']],
@@ -1278,8 +1242,15 @@ display: inline-block;"
             $filesconditions = [
                 'component' => 'assignsubmission_file',
                 'itemid' => $eventdata['objectid'],
-                'userid' => $eventdata['userid'],
             ];
+            // Every member of a group may have uploaded to its submission, not
+            // only the one who submitted it.
+            if (!$isgroupsubmission) {
+                $filesconditions['userid'] = $eventdata['userid'];
+            }
+
+            // Membership of each group member, asked once per event.
+            $authorsmembership = [$USER->id => $ismember];
 
             $moodlefiles = $DB->get_records('files', $filesconditions);
             if ($moodlefiles) {
@@ -1310,20 +1281,45 @@ display: inline-block;"
                         continue;
                     }
 
+                    $author = $USER;
+                    if ($isgroupsubmission) {
+                        // With "Require all members to submit" every member's
+                        // click fires this event, and each would queue the file
+                        // again and be charged for it.
+                        if ($DB->record_exists('plagiarism_pchkorg_files', ['fileid' => $file->get_id()])) {
+                            continue;
+                        }
+                        $uploaderid = (int) $file->get_userid();
+                        if ($uploaderid && $uploaderid !== (int) $USER->id) {
+                            $uploader = $DB->get_record('user', ['id' => $uploaderid, 'deleted' => 0]);
+                            if ($uploader) {
+                                $author = $uploader;
+                            }
+                        }
+                    }
+                    if (!array_key_exists($author->id, $authorsmembership)) {
+                        $authorsmembership[$author->id] = $this->is_member_or_registered(
+                            $apiprovider,
+                            $author,
+                            $context,
+                            $pchkorgconfigmodel
+                        );
+                    }
+
                     $filerecord = new \stdClass();
                     $filerecord->fileid = $file->get_id();
                     $filerecord->cm = $cmid;
-                    $filerecord->userid = $USER->id;
+                    $filerecord->userid = $author->id;
                     $filerecord->textid = null;
                     $filerecord->created_at = time();
                     $filerecord->itemid = $eventdata['objectid'];
                     $filerecord->signature = sha1($content);
-                    if ($ismember) {
+                    if ($authorsmembership[$author->id]) {
                         $filerecord->state = plagiarism_pchkorg_state::LOCAL_QUEUED;
                     } else {
                         $filerecord->message = self::truncate_message(sprintf(
                             'User %s is not a member of group',
-                            $USER->email
+                            $author->email
                         ));
                         $filerecord->state = plagiarism_pchkorg_state::LOCAL_ERROR;
                     }
@@ -1347,9 +1343,14 @@ display: inline-block;"
                 'userid' => $USER->id,
                 'itemid' => $eventdata['objectid'],
             ];
+            // A group's text is one document whoever saved or submitted it, so
+            // it is queued once: by whoever saved it, normally, since saving
+            // comes before submitting.
+            if ($isgroupsubmission) {
+                unset($filesconditions['userid']);
+            }
 
-            $oldfile = $DB->get_record('plagiarism_pchkorg_files', $filesconditions);
-            if ($oldfile) {
+            if ($DB->record_exists('plagiarism_pchkorg_files', $filesconditions)) {
                 // There is the same check in database, so we can skip this one.
                 return true;
             }
@@ -1375,6 +1376,52 @@ display: inline-block;"
         }
 
         return true;
+    }
+
+    /**
+     * Whether a submission by this person may be queued, registering them first where the group allows it.
+     *
+     * Only for some type of account, this calls a remote HTTP API. The answer
+     * is cached per user, there is an 8 second timeout, and even if the service
+     * is unavailable it is asked only once. The raw email is not used as the
+     * identity on a course-scoped site.
+     *
+     * @param plagiarism_pchkorg_api_provider $apiprovider
+     * @param stdClass $user The author of the submission.
+     * @param context $context Module context, for the role the person registers with.
+     * @param plagiarism_pchkorg_config_model $configmodel
+     * @return bool
+     */
+    private function is_member_or_registered($apiprovider, $user, $context, $configmodel) {
+        $servicelogin = plagiarism_pchkorg_service_login::resolve($apiprovider, $user, $configmodel);
+        $ismemberresponse = $servicelogin->member;
+        if (!$ismemberresponse->is_known) {
+            // The service could not be reached or answered with something we
+            // could not parse. We don't know whether this user is a member,
+            // so queue the submission rather than fail it outright: the send
+            // step retries on transient failures and can reject it later
+            // with a concrete reason if the user genuinely is not a member.
+            return true;
+        }
+        if ($ismemberresponse->is_member) {
+            return true;
+        }
+        if (!$ismemberresponse->is_auto_registration_enabled) {
+            return false;
+        }
+
+        $name = $user->firstname . ' ' . $user->lastname;
+        // Moodle has multiple roles in courses.
+        $isstudent = plagiarism_pchkorg_roles::is_student($context, $user->id);
+        // Registered under whichever identity the lookup just failed to
+        // find them by, so the account created here is the one the next
+        // membership check will look for.
+        return (bool) $apiprovider->auto_registrate_member(
+            $name,
+            $servicelogin->login,
+            $isstudent ? 3 : 2,
+            plagiarism_pchkorg_service_login::additional_email($user, $servicelogin->login)
+        );
     }
 
     /**

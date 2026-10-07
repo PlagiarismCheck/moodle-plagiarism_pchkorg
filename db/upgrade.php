@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/../classes/permissions/capability.class.php');
 require_once(__DIR__ . '/../classes/roles.php');
+require_once(__DIR__ . '/../classes/group_submission.php');
 
 use plagiarism_pchkorg\classes\permissions\capability;
 
@@ -156,6 +157,15 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         plagiarism_pchkorg_roles::grant_to_custom_teachers(capability::MANAGE_IGNORE_TEMPLATES);
 
         upgrade_plugin_savepoint(true, 2026082601, 'plagiarism', 'pchkorg');
+    }
+
+    if ($oldversion < 2026100700) {
+        // Files of group assignment submissions never resolved before this
+        // release, so they ran out of attempts and were left failed without
+        // ever being sent. Queue them again now that they can be.
+        plagiarism_pchkorg_group_submission::requeue_unresolved();
+
+        upgrade_plugin_savepoint(true, 2026100700, 'plagiarism', 'pchkorg');
     }
 
     return true;

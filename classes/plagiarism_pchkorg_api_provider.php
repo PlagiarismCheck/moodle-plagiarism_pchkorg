@@ -125,6 +125,7 @@ class plagiarism_pchkorg_api_provider {
      * @param array $filters
      * @param string|null $email Email of the acting user, for group token auth.
      * @param string|null $coursename Course fullname, shown in service reports.
+     * @param string|null $innercheckkey Identity of a group submission; see inner_check_key_field().
      *
      * @return int|null
      */
@@ -140,7 +141,8 @@ class plagiarism_pchkorg_api_provider {
         $filename,
         $filters = [],
         $email = null,
-        $coursename = null
+        $coursename = null,
+        $innercheckkey = null
     ) {
         if ($this->is_group_token()) {
             return $this->send_group_text(
@@ -155,7 +157,8 @@ class plagiarism_pchkorg_api_provider {
                 $filename,
                 $filters,
                 $email,
-                $coursename
+                $coursename,
+                $innercheckkey
             );
         } else {
             return $this->send_text(
@@ -189,6 +192,7 @@ class plagiarism_pchkorg_api_provider {
      * @param array $filters
      * @param string|null $email Email of the acting user, for group token auth.
      * @param string|null $coursename Course fullname, shown in service reports.
+     * @param string|null $innercheckkey Identity of a group submission; see inner_check_key_field().
      *
      * @return int|null
      */
@@ -204,7 +208,8 @@ class plagiarism_pchkorg_api_provider {
         $filename,
         $filters = [],
         $email = null,
-        $coursename = null
+        $coursename = null,
+        $innercheckkey = null
     ) {
 
         $response = $this->transport->post(
@@ -220,7 +225,8 @@ class plagiarism_pchkorg_api_provider {
                 $mime,
                 $filename,
                 $filters,
-                $coursename
+                $coursename,
+                $innercheckkey
             ),
             [
                         'CURLOPT_RETURNTRANSFER' => true,
@@ -262,6 +268,7 @@ class plagiarism_pchkorg_api_provider {
      * @param $filename
      * @param array $filters
      * @param string|null $coursename Course fullname, shown in service reports.
+     * @param string|null $innercheckkey Identity of a group submission; see inner_check_key_field().
      * @return array
      */
     private function get_fields_for_group(
@@ -275,7 +282,8 @@ class plagiarism_pchkorg_api_provider {
         $mime,
         $filename,
         $filters = [],
-        $coursename = null
+        $coursename = null,
+        $innercheckkey = null
     ) {
         $fields = array_merge($this->common_fields(), [
             'token' => $this->token,
@@ -289,6 +297,7 @@ class plagiarism_pchkorg_api_provider {
         ]);
 
         $fields = array_merge($fields, $this->course_name_field($coursename));
+        $fields = array_merge($fields, $this->inner_check_key_field($innercheckkey));
         $fields = array_merge($fields, $this->filter_fields($filters));
         $fields['content'] = $this->file_field($content, $mime, $filename);
 
@@ -430,6 +439,26 @@ class plagiarism_pchkorg_api_provider {
         }
 
         return ['course_name' => $coursename];
+    }
+
+    /**
+     * The group submission identity as a form field.
+     *
+     * The service's inner check indexes and excludes a group's files under
+     * this identity rather than their uploader, so files of one group's
+     * submission never match each other. Only group submissions have one, and
+     * a send without it stays byte for byte what it always was. Only the group
+     * path sends it: a personal token has no organization, so no inner check.
+     *
+     * @param string|null $innercheckkey
+     * @return array
+     */
+    private function inner_check_key_field($innercheckkey) {
+        if (null === $innercheckkey || '' === $innercheckkey) {
+            return [];
+        }
+
+        return ['inner_check_key' => $innercheckkey];
     }
 
     /**

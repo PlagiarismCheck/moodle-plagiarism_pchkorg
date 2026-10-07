@@ -50,12 +50,15 @@ class plagiarism_pchkorg_assign_resolver implements plagiarism_pchkorg_resolver 
             return null;
         }
 
-        return plagiarism_pchkorg_payload::from_html(
+        $payload = plagiarism_pchkorg_payload::from_html(
             $submission->id,
             $submission->id,
             $submission->onlinetext,
             sprintf('%s-submission.txt', $submission->id)
         );
+        $payload->innercheckkey = self::inner_check_key(self::submission($filedb, $cm), $cm);
+
+        return $payload;
     }
 
     /**
@@ -67,30 +70,66 @@ class plagiarism_pchkorg_assign_resolver implements plagiarism_pchkorg_resolver 
      * @return plagiarism_pchkorg_payload|null
      */
     public function resolve_file($filedb, $cm, $file) {
-        $submissionid = self::assign_submission_id($filedb, $cm);
-        if (null === $submissionid) {
+        $submission = self::submission($filedb, $cm);
+        if (null === $submission) {
             return null;
         }
 
-        return plagiarism_pchkorg_payload::from_file($submissionid, $file);
+        $payload = plagiarism_pchkorg_payload::from_file($submission->id, $file);
+        $payload->innercheckkey = self::inner_check_key($submission, $cm);
+
+        return $payload;
     }
 
     /**
      * The service keys submissions by the assignment submission id.
+     *
+     * Matched on the submission id and assignment only, not on the queued
+     * author. A group submission is stored with userid 0, so requiring the
+     * author's id there never matched and the record was retried until it
+     * failed. The assignment check still keeps a record from resolving to a
+     * submission of another activity.
      *
      * @param stdClass $filedb
      * @param stdClass $cm
      * @return int|null Null when the submission has since been removed.
      */
     public static function assign_submission_id($filedb, $cm) {
+        $submission = self::submission($filedb, $cm);
+
+        return $submission ? $submission->id : null;
+    }
+
+    /**
+     * The assignment submission a queued record belongs to.
+     *
+     * @param stdClass $filedb
+     * @param stdClass $cm
+     * @return stdClass|null id, userid and groupid; null when it has since been removed.
+     */
+    private static function submission($filedb, $cm) {
         global $DB;
 
         $submission = $DB->get_record('assign_submission', [
             'assignment' => $cm->instance,
-            'userid' => $filedb->userid,
             'id' => $filedb->itemid,
-        ], 'id');
+        ], 'id, userid, groupid');
 
-        return $submission ? $submission->id : null;
+        return $submission ? $submission : null;
+    }
+
+    /**
+     * The inner check identity of a group submission, or null for an individual one.
+     *
+     * @param stdClass|null $submission
+     * @param stdClass $cm
+     * @return string|null
+     */
+    private static function inner_check_key($submission, $cm) {
+        if (null === $submission || 0 !== (int) $submission->userid) {
+            return null;
+        }
+
+        return plagiarism_pchkorg_group_submission::inner_check_key($cm, (int) $submission->groupid);
     }
 }

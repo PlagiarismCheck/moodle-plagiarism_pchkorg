@@ -54,6 +54,16 @@ class plagiarism_pchkorg_payload {
     public $filename;
 
     /**
+     * Identity of the group submission the document belongs to.
+     *
+     * Null for an individual submission. See
+     * plagiarism_pchkorg_group_submission::inner_check_key().
+     *
+     * @var string|null
+     */
+    public $innercheckkey = null;
+
+    /**
      * Build a payload.
      *
      * @param mixed $submissionid

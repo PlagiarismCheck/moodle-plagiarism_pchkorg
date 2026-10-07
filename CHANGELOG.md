@@ -2,6 +2,32 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.21.0 — 7 October 2026
+
+- **Group assignments are now checked.** A submission made by a group,
+  including the shared "Default group" of students who are in no group or in
+  several, used to be retried until it failed and was never sent. Individual
+  submissions are checked exactly as before, and both kinds can be used side by
+  side in one course.
+- Each file is credited to the group member who **uploaded** it, and the online
+  text to whoever saved it. When one member uploads and another submits, every
+  member's files are now sent, not only the submitter's.
+- A group submission is checked **once**, however many members click Submit
+  when "Require all group members submit" is on. Every member sees the same
+  result, subject to the existing student visibility settings.
+- The upgrade queues again the group submission files that failed only because
+  of this. Files the service itself turned down are left as they are.
+- With **inner check** on, files from one group's submission to an assignment
+  no longer match each other. Each group submission is sent with an
+  `inner_check_key` naming the site, the activity and the Moodle group, and
+  the service indexes and excludes the group's files under it. Other groups,
+  other assignments and individual work still match as before, and reports
+  still name the member who uploaded the file. Group tokens only: a personal
+  token has no inner check.
+- **Requires the matching PlagiarismCheck.org release**, which adds the
+  `inner_check_key` field. An older service ignores it: group files are still
+  checked, but a group's own files can then match each other.
+
 ## v3.20.0 — 11 September 2026
 
 - Submissions now carry the **course fullname** as well as the course ID, so
