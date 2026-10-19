@@ -107,6 +107,39 @@ class report_link_test extends \advanced_testcase {
     }
 
     /**
+     * The case Custom teaching roles exists for: a Tutor role allowed to view
+     * results, but not moodle/grade:viewall, sees the score and the report
+     * link on another student's work once listed, even where students may see
+     * neither. Unlisted, it is held to the student settings and sees nothing.
+     */
+    public function test_a_listed_custom_role_sees_what_a_teacher_sees(): void {
+        $this->resetAfterTest(true);
+        $data = $this->setup_submission([
+            'pchkorg_student_can_see_widget' => '0',
+            'pchkorg_student_can_see_report' => '0',
+        ]);
+
+        $roleid = create_role('Tutor', 'tutor', 'Custom role for testing');
+        set_role_contextlevels($roleid, [CONTEXT_COURSE, CONTEXT_MODULE]);
+        $systemcontextid = \context_system::instance()->id;
+        assign_capability('plagiarism/pchkorg:viewsimilarity', CAP_ALLOW, $roleid, $systemcontextid);
+        assign_capability('mod/assign:view', CAP_ALLOW, $roleid, $systemcontextid);
+        accesslib_clear_all_caches_for_unit_testing();
+
+        $tutor = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($tutor->id, $data->cm->course, $roleid);
+        $this->setUser($tutor);
+
+        $configmodel = new \plagiarism_pchkorg_config_model();
+
+        $configmodel->set_system_config(\plagiarism_pchkorg_roles::CONFIG_NAME, 'ta');
+        $this->assertStringNotContainsString('report.php', $this->render($data), 'not listed');
+
+        $configmodel->set_system_config(\plagiarism_pchkorg_roles::CONFIG_NAME, "ta\ntutor");
+        $this->assertStringContainsString('report.php', $this->render($data), 'listed');
+    }
+
+    /**
      * Build a course with an assignment, an enrolled teacher and student, plugin
      * configuration, and one checked submission belonging to the student.
      *

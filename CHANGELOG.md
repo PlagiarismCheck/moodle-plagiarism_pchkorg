@@ -2,6 +2,25 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.21.2 — 19 October 2026
+
+- **The custom teaching roles are now a site setting.** "Custom teaching roles"
+  in the plugin settings lists, one shortname per line, the site's own roles
+  whose holders are treated as teachers: they see the score and the report for
+  every student, and teacher auto-registration imports them. A Tutor role
+  allowed to view results, but not `moodle/grade:viewall`, used to be treated
+  as a student; adding its shortname fixes that.
+- The upgrade fills the setting with the eleven roles the plugin recognised
+  before, plus `tutor`, so a site's Tutor role is treated as a teacher from
+  now on. An empty setting means no custom roles. The four stock teaching roles
+  always count.
+- The setting grants no permissions. A role added to it is not given
+  `plagiarism/pchkorg:manageignoretemplates`, and removing a role does not
+  deregister anyone already registered with PlagiarismCheck.org.
+- Teacher auto-registration now matches role shortnames regardless of case, so
+  a role created through the API with capitals in its shortname is found on
+  PostgreSQL too.
+
 ## v3.21.0 — 7 October 2026
 
 - **Group assignments are now checked.** A submission made by a group,

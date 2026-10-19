@@ -92,6 +92,23 @@ under a username is registered again under their address.
 
 Reports from submissions made before your site recorded course information, and reports that did not come from Moodle at all,
 are unaffected: those stay governed by the institution-wide role.';
+$string['pchkorg_custom_teacher_roles'] = 'Custom teaching roles';
+$string['pchkorg_custom_teacher_roles_help'] = 'Shortnames of your own roles whose holders should be treated as teachers, one per line.
+Use the role\'s shortname, as shown under Site administration > Users > Define roles, not its full name.
+
+A teacher sees the similarity score and the full report for every student, rather than only for their own work and only
+where the activity allows students to. Teachers in these roles are also imported by teacher auto-registration.
+
+Manager, Course creator, Teacher and Non-editing teacher always count as teaching roles, as does any role allowed
+moodle/grade:viewall, so they need not be listed here.
+
+* This setting decides who is treated as a teacher. It grants no permissions: a role must still be allowed
+plagiarism/pchkorg:viewsimilarity to see results at all, and plagiarism/pchkorg:manageignoretemplates to manage
+ignored templates. Grant those under Define roles.
+* Removing a role from this list does not remove anyone already registered with PlagiarismCheck.org.';
+$string['pchkorg_custom_teacher_roles_invalid'] = 'These are not valid role shortnames: {$a}. A shortname may contain only letters, digits, hyphens and underscores.';
+$string['pchkorg_custom_teacher_roles_toolong'] = 'The list is too long. It may hold at most {$a} characters.';
+$string['pchkorg_custom_teacher_roles_unknown'] = 'No role on this site has these shortnames, so they currently match nobody: {$a}.';
 $string['pchkorg_disclosure'] = 'Submission will be sent to <a target="_blank" href="https://plagiarismcheck.org/">PlagiarismCheck.org</a> for check.
 <br />
 By submitting assignment I agree with <a target="_blank" href="https://plagiarismcheck.org/terms-of-service/">Terms &amp; Conditions</a>

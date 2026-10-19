@@ -25,6 +25,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/plagiarism_pchkorg_config_model.php');
+
 /**
  * Which roles count as teaching roles.
  *
@@ -38,6 +40,46 @@ defined('MOODLE_INTERNAL') || die();
  * auto-registration task looks for teachers to import.
  */
 class plagiarism_pchkorg_roles {
+    /**
+     * Name of the site setting holding the custom teaching role shortnames.
+     *
+     * Stored like every other global setting of this plugin, against cm 0 in
+     * plagiarism_pchkorg_config, one shortname per line.
+     */
+    const CONFIG_NAME = 'pchkorg_custom_teacher_roles';
+
+    /**
+     * Longest value the setting can hold.
+     *
+     * The width of plagiarism_pchkorg_config.value. Widening it to TEXT would
+     * cost a portable comparison everywhere the table is queried by value.
+     */
+    const CONFIG_MAX_LENGTH = 255;
+
+    /**
+     * Custom teaching roles a site starts with.
+     *
+     * The roles used by institutions running this plugin before the list
+     * became a setting, plus tutor. Written into the setting once, on install
+     * or upgrade, after which the site's own list is what counts.
+     *
+     * @var string[]
+     */
+    const DEFAULT_CUSTOM_TEACHER_SHORTNAMES = [
+        'l',
+        'ta',
+        'cce',
+        'hod',
+        'cl',
+        'ca',
+        'lib',
+        'led',
+        'id',
+        'adt1',
+        'adt1tii',
+        'tutor',
+    ];
+
     /**
      * Capability that distinguishes a teacher from a student.
      *
@@ -61,8 +103,8 @@ class plagiarism_pchkorg_roles {
     /**
      * Teaching role shortnames.
      *
-     * The Moodle defaults followed by the custom roles used by institutions
-     * running this plugin.
+     * The Moodle defaults followed by the custom roles configured for this
+     * site.
      *
      * @return string[]
      */
@@ -79,22 +121,134 @@ class plagiarism_pchkorg_roles {
      * can be relied on to reach these roles. Granting them a capability takes
      * an upgrade step that looks them up by shortname.
      *
+     * Read from the site setting. A setting never stored falls back to the
+     * defaults rather than to nothing: the 2026082601 upgrade step asks for
+     * this list before the step that stores the setting has run, and a site
+     * upgrading across both must still grant its custom roles what they had.
+     * A setting stored empty means the site wants no custom roles.
+     *
      * @return string[]
      */
     public static function custom_teacher_shortnames() {
-        return [
-            'l',
-            'ta',
-            'cce',
-            'hod',
-            'cl',
-            'ca',
-            'lib',
-            'led',
-            'id',
-            'adt1',
-            'adt1tii',
-        ];
+        $value = (new plagiarism_pchkorg_config_model())->get_system_config(self::CONFIG_NAME);
+        if (null === $value) {
+            return self::DEFAULT_CUSTOM_TEACHER_SHORTNAMES;
+        }
+
+        return self::parse_shortnames($value);
+    }
+
+    /**
+     * Turn the setting as typed into a list of shortnames.
+     *
+     * Entries may be separated by new lines, commas or spaces. They are
+     * lowercased, since Moodle's role editor saves shortnames lowercased and
+     * the comparisons in this class are made against lowercased names. The
+     * stock roles are dropped, as they always count and listing them twice
+     * would only put them in the SQL twice.
+     *
+     * @param string $value
+     * @return string[] In the order given, without duplicates.
+     */
+    public static function parse_shortnames($value) {
+        $shortnames = [];
+        foreach (preg_split('/[\s,]+/u', (string) $value, -1, PREG_SPLIT_NO_EMPTY) as $entry) {
+            $shortname = core_text::strtolower($entry);
+            if (in_array($shortname, self::DEFAULT_TEACHER_SHORTNAMES, true)) {
+                continue;
+            }
+            $shortnames[$shortname] = $shortname;
+        }
+
+        return array_values($shortnames);
+    }
+
+    /**
+     * The stored form of a list of shortnames.
+     *
+     * @param string[] $shortnames
+     * @return string One shortname per line.
+     */
+    public static function format_shortnames(array $shortnames) {
+        return implode("\n", $shortnames);
+    }
+
+    /**
+     * Normalise the setting as typed into the form it is stored in.
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function normalise_setting($value) {
+        return self::format_shortnames(self::parse_shortnames($value));
+    }
+
+    /**
+     * Entries in the setting that cannot be a role shortname.
+     *
+     * Moodle's role editor keeps a shortname to the characters PARAM_ALPHANUMEXT
+     * allows, so anything else can never match a role.
+     *
+     * @param string $value The setting as typed.
+     * @return string[]
+     */
+    public static function invalid_shortnames($value) {
+        $invalid = [];
+        foreach (self::parse_shortnames($value) as $shortname) {
+            if (clean_param($shortname, PARAM_ALPHANUMEXT) !== $shortname) {
+                $invalid[] = $shortname;
+            }
+        }
+
+        return $invalid;
+    }
+
+    /**
+     * Shortnames that no role on this site has.
+     *
+     * Not an error: a site may list a role before creating it. Reported so a
+     * typo does not go unnoticed.
+     *
+     * @param string[] $shortnames
+     * @return string[]
+     */
+    public static function unknown_shortnames(array $shortnames) {
+        global $DB;
+
+        if (empty($shortnames)) {
+            return [];
+        }
+
+        $known = [];
+        foreach ($DB->get_fieldset_sql('SELECT shortname FROM {role}') as $shortname) {
+            $known[core_text::strtolower($shortname)] = true;
+        }
+
+        return array_values(array_filter($shortnames, function ($shortname) use ($known) {
+            return !isset($known[$shortname]);
+        }));
+    }
+
+    /**
+     * Store the default custom roles, unless the site already has a list.
+     *
+     * Used on install and upgrade. A stored value, including an empty one, is
+     * a decision the site made and is left alone.
+     *
+     * @return bool Whether the defaults were written.
+     */
+    public static function store_default_setting() {
+        $configmodel = new plagiarism_pchkorg_config_model();
+        if (null !== $configmodel->get_system_config(self::CONFIG_NAME)) {
+            return false;
+        }
+
+        $value = self::format_shortnames(self::DEFAULT_CUSTOM_TEACHER_SHORTNAMES);
+        // Both stores, as the settings page writes both.
+        set_config(self::CONFIG_NAME, $value, 'plagiarism_pchkorg');
+        $configmodel->set_system_config(self::CONFIG_NAME, $value);
+
+        return true;
     }
 
     /**

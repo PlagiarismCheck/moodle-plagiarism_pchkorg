@@ -1481,6 +1481,10 @@ display: inline-block;"
         // CONCAT are MySQL spellings, string columns must not be compared to
         // integers, and ordering by a column that is neither selected nor
         // grouped is rejected outside MySQL.
+        //
+        // The shortname list is lowercase, and a role created through the API
+        // rather than the role editor can keep capitals, which Postgres would
+        // then fail to match; hence LOWER() below.
         [$rolesql, $roleparams] = $DB->get_in_or_equal(
             plagiarism_pchkorg_roles::teacher_shortnames(),
             SQL_PARAMS_NAMED,
@@ -1513,7 +1517,7 @@ display: inline-block;"
                   JOIN {context} ctxcourse ON ctxcourse.id = ra.contextid
                        AND ctxcourse.contextlevel = :coursecontext
                  WHERE u.deleted = 0
-                   AND r.shortname {$rolesql}
+                   AND LOWER(r.shortname) {$rolesql}
                    AND e.courseid IN (
                        SELECT c.id
                          FROM {assign} a

@@ -80,6 +80,20 @@ new activities use the plugin by default, set a minimum source-similarity
 threshold, and configure teacher auto-registration where supported by the
 institutional account.
 
+### Custom teaching roles
+
+Manager, Course creator, Teacher and Non-editing teacher, and any role allowed
+`moodle/grade:viewall`, are treated as teachers: they see the score and the
+report for every student, and teacher auto-registration imports them. A site's
+own roles, such as a Tutor role that does not grade, can be added under
+**Custom teaching roles** in the plugin settings, one role shortname per line.
+The setting starts with the custom roles earlier versions of this plugin
+recognised, plus `tutor`.
+
+The setting only decides who is treated as a teacher. A role still needs
+`plagiarism/pchkorg:viewsimilarity` to see results at all, granted under
+**Site administration > Users > Define roles**.
+
 ## Using the plugin
 
 When creating or editing a supported activity, expand the
@@ -165,9 +179,10 @@ uploaded a second time and none of the institution's allowance is used.
 
 Managing templates requires the `plagiarism/pchkorg:manageignoretemplates`
 capability, which by default is held by editing teachers, managers and course
-creators, plus the custom teaching roles this plugin recognises. Administrators
-can grant it to any other role, or withhold it from a role that otherwise edits
-activities. Note that the section itself lives in the activity settings form,
+creators, plus the custom teaching roles this plugin recognised when it was
+upgraded to v3.16.4. A role added to **Custom teaching roles** later is not
+granted it automatically. Administrators can grant it to any other role, or
+withhold it from a role that otherwise edits activities. Note that the section itself lives in the activity settings form,
 which Moodle gates on `moodle/course:manageactivities`, so a role needs both to
 change templates through the form.
 

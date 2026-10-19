@@ -164,6 +164,22 @@ class ignore_template_capability_test extends \advanced_testcase {
     }
 
     /**
+     * The grant reaches the roles the site lists, not the defaults it replaced.
+     */
+    public function test_the_grant_follows_the_custom_teaching_roles_setting(): void {
+        $tutor = $this->user_with_custom_role('tutor');
+        $ta = $this->user_with_custom_role('ta');
+
+        (new \plagiarism_pchkorg_config_model())->set_system_config(\plagiarism_pchkorg_roles::CONFIG_NAME, 'tutor');
+
+        \plagiarism_pchkorg_roles::grant_to_custom_teachers(self::CAPABILITY);
+        accesslib_clear_all_caches_for_unit_testing();
+
+        $this->assertTrue($this->can_manage($tutor), 'listed');
+        $this->assertFalse($this->can_manage($ta), 'a default the site removed');
+    }
+
+    /**
      * Only the roles this plugin knows by name. A site's own roles are its own
      * business.
      */

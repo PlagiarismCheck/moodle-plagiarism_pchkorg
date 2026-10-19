@@ -197,6 +197,39 @@ class course_access_test extends \advanced_testcase {
     }
 
     /**
+     * A site's own role listed under Custom teaching roles is a teacher here
+     * too, and is granted the course; unlisted, it is left to reach only its
+     * own work like a student. The role has no moodle/grade:viewall, so only
+     * the list can decide.
+     */
+    public function test_grant_follows_the_custom_teaching_roles_setting(): void {
+        $this->resetAfterTest(true);
+        $data = $this->setup_course(true);
+
+        $roleid = create_role('Tutor', 'tutor', 'Custom role for testing');
+        set_role_contextlevels($roleid, [CONTEXT_COURSE, CONTEXT_MODULE]);
+        $tutor = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($tutor->id, $data->course->id, $roleid);
+        $this->setUser($tutor);
+
+        foreach (['listed' => [1, "ta\ntutor"], 'not listed' => [0, 'ta']] as $label => [$requests, $setting]) {
+            $data->configmodel->set_system_config(\plagiarism_pchkorg_roles::CONFIG_NAME, $setting);
+            $transport = $this->transport([json_encode(['success' => true])]);
+
+            $allowed = \plagiarism_pchkorg_course_access::ensure_report_access(
+                $this->provider($transport),
+                $data->context,
+                $data->course->id,
+                $tutor->email,
+                $data->configmodel
+            );
+
+            $this->assertTrue($allowed, $label);
+            $this->assertSame($requests, $transport->request_count(), $label);
+        }
+    }
+
+    /**
      * A refused grant stops the report page. Handing the teacher onward would
      * land them on a service-side refusal they cannot interpret.
      */

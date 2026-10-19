@@ -175,7 +175,7 @@ class auto_registration_test extends \advanced_testcase {
                   JOIN {context} ctxcourse ON ctxcourse.id = ra.contextid
                        AND ctxcourse.contextlevel = :coursecontext
                  WHERE u.deleted = 0
-                   AND r.shortname {$rolesql}
+                   AND LOWER(r.shortname) {$rolesql}
                    AND e.courseid IN (
                        SELECT c.id
                          FROM {assign} a

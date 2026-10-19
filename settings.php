@@ -61,6 +61,11 @@ if (($data = $mform->get_data()) && confirm_sesskey()) {
 
     foreach ($data as $field => $value) {
         if (strpos($field, 'pchkorg') === 0) {
+            // Stored one shortname per line, lowercased, so both stores and
+            // every later read agree on what the site listed.
+            if (plagiarism_pchkorg_roles::CONFIG_NAME === $field) {
+                $value = plagiarism_pchkorg_roles::normalise_setting($value);
+            }
             if ('pchkorg_use' === $field) {
                 set_config('enabled', $value, 'plagiarism_pchkorg');
             } else {
@@ -73,6 +78,20 @@ if (($data = $mform->get_data()) && confirm_sesskey()) {
         }
     }
     $OUTPUT->notification(get_string('savedconfigsuccess', 'plagiarism_pchkorg'), 'notifysuccess');
+
+    // A role listed before it exists is allowed, but a typo should not pass
+    // unnoticed: it matches nobody and the role it was meant for stays a student.
+    if (isset($data->{plagiarism_pchkorg_roles::CONFIG_NAME})) {
+        $unknown = plagiarism_pchkorg_roles::unknown_shortnames(
+            plagiarism_pchkorg_roles::parse_shortnames($data->{plagiarism_pchkorg_roles::CONFIG_NAME})
+        );
+        if (!empty($unknown)) {
+            echo $OUTPUT->notification(
+                get_string('pchkorg_custom_teacher_roles_unknown', 'plagiarism_pchkorg', implode(', ', $unknown)),
+                'notifymessage'
+            );
+        }
+    }
 
     // Validate the token here and when the page renders below, and nowhere
     // else: not per assignment edit, not in scheduled tasks. The three outcomes

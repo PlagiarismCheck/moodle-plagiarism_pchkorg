@@ -25,6 +25,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/../classes/roles.php');
+
 /**
  * Class defined plugin settings form.
  */
@@ -131,6 +133,23 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->setDefault('pchkorg_teacher_auto_registration', '0');
 
         $mform->addElement(
+            'textarea',
+            plagiarism_pchkorg_roles::CONFIG_NAME,
+            get_string('pchkorg_custom_teacher_roles', 'plagiarism_pchkorg'),
+            ['rows' => 8, 'cols' => 30]
+        );
+        $mform->addHelpButton(
+            plagiarism_pchkorg_roles::CONFIG_NAME,
+            'pchkorg_custom_teacher_roles',
+            'plagiarism_pchkorg'
+        );
+        $mform->setType(plagiarism_pchkorg_roles::CONFIG_NAME, PARAM_TEXT);
+        $mform->setDefault(
+            plagiarism_pchkorg_roles::CONFIG_NAME,
+            plagiarism_pchkorg_roles::format_shortnames(plagiarism_pchkorg_roles::DEFAULT_CUSTOM_TEACHER_SHORTNAMES)
+        );
+
+        $mform->addElement(
             'select',
             'pchkorg_course_access',
             get_string('pchkorg:courseaccess', 'plagiarism_pchkorg'),
@@ -140,5 +159,39 @@ class plagiarism_pchkorg_setup_form extends moodleform {
         $mform->setDefault('pchkorg_course_access', '0');
 
         $this->add_action_buttons(true);
+    }
+
+    /**
+     * Validate the settings.
+     *
+     * @param array $data
+     * @param array $files
+     * @return array Errors keyed by element name.
+     */
+    public function validation($data, $files) {
+        $errors = parent::validation($data, $files);
+
+        $name = plagiarism_pchkorg_roles::CONFIG_NAME;
+        if (isset($data[$name])) {
+            $invalid = plagiarism_pchkorg_roles::invalid_shortnames($data[$name]);
+            if (!empty($invalid)) {
+                $errors[$name] = get_string(
+                    'pchkorg_custom_teacher_roles_invalid',
+                    'plagiarism_pchkorg',
+                    implode(', ', $invalid)
+                );
+            } else if (
+                core_text::strlen(plagiarism_pchkorg_roles::normalise_setting($data[$name]))
+                    > plagiarism_pchkorg_roles::CONFIG_MAX_LENGTH
+            ) {
+                $errors[$name] = get_string(
+                    'pchkorg_custom_teacher_roles_toolong',
+                    'plagiarism_pchkorg',
+                    plagiarism_pchkorg_roles::CONFIG_MAX_LENGTH
+                );
+            }
+        }
+
+        return $errors;
     }
 }

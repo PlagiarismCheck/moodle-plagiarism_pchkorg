@@ -322,6 +322,59 @@ class auto_registration_cron_test extends \advanced_testcase {
     }
 
     /**
+     * A site's own role, once listed under Custom teaching roles, is imported
+     * like any teacher. The role is created with capitals, as the API allows,
+     * so this also pins the case-insensitive match on PostgreSQL.
+     */
+    public function test_registers_a_teacher_in_a_listed_custom_role(): void {
+        global $DB;
+        $this->resetAfterTest(true);
+
+        $configmodel = $this->enable_auto_registration();
+        $configmodel->set_system_config(\plagiarism_pchkorg_roles::CONFIG_NAME, 'tutor');
+        $tutor = $this->setup_course_with_teacher('listed-tutor-cron@example.com', $this->custom_role('Tutor'));
+
+        $transport = $this->transport([$this->not_a_member(), json_encode(['success' => true])]);
+
+        $this->assertTrue($this->plugin()->cron_auto_registrate_teachers($this->provider($transport)));
+
+        $this->assertTrue($DB->record_exists('plagiarism_pchkorg_users', ['email' => $tutor->email]));
+        $this->assertSame(2, $transport->request(1)['params']['role'], 'registered as a teacher');
+    }
+
+    /**
+     * The same role, not listed, is nobody the task looks for.
+     */
+    public function test_skips_a_custom_role_that_is_not_listed(): void {
+        global $DB;
+        $this->resetAfterTest(true);
+
+        $configmodel = $this->enable_auto_registration();
+        $configmodel->set_system_config(\plagiarism_pchkorg_roles::CONFIG_NAME, 'ta');
+        $tutor = $this->setup_course_with_teacher('unlisted-tutor-cron@example.com', $this->custom_role('tutor'));
+
+        $transport = $this->transport();
+
+        $this->assertTrue($this->plugin()->cron_auto_registrate_teachers($this->provider($transport)));
+
+        $this->assertFalse($DB->record_exists('plagiarism_pchkorg_users', ['email' => $tutor->email]));
+        $this->assertSame(0, $transport->request_count(), 'nobody to ask about');
+    }
+
+    /**
+     * A role that exists only on this site, with no archetype.
+     *
+     * @param string $shortname
+     * @return int Role id.
+     */
+    private function custom_role($shortname) {
+        $roleid = create_role('Custom ' . $shortname, $shortname, 'Custom role for testing');
+        set_role_contextlevels($roleid, [CONTEXT_COURSE, CONTEXT_MODULE]);
+
+        return $roleid;
+    }
+
+    /**
      * A membership response saying "not a member, auto-registration on".
      *
      * @return string
@@ -385,9 +438,10 @@ class auto_registration_cron_test extends \advanced_testcase {
      * enrol one editing teacher, exactly as the cron's query expects.
      *
      * @param string $email Must be unique across this whole test run; see below.
+     * @param string|int $role Shortname or id of the role to enrol them with.
      * @return \stdClass The enrolled teacher.
      */
-    private function setup_course_with_teacher($email) {
+    private function setup_course_with_teacher($email, $role = 'editingteacher') {
         global $DB;
 
         $generator = $this->getDataGenerator();
@@ -399,7 +453,7 @@ class auto_registration_cron_test extends \advanced_testcase {
         // test: the email must be unique across this whole test run, so an
         // auto-generated one is not safe to rely on.
         $teacher = $generator->create_user(['email' => $email]);
-        $generator->enrol_user($teacher->id, $course->id, 'editingteacher');
+        $generator->enrol_user($teacher->id, $course->id, $role);
 
         $cm = get_coursemodule_from_instance('assign', $assign->id);
         $config = new \stdClass();

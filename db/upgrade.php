@@ -168,5 +168,15 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026100700, 'plagiarism', 'pchkorg');
     }
 
+    if ($oldversion < 2026101900) {
+        // The custom teaching roles became a site setting. Store the list the
+        // code used to hard-code, so the site keeps recognising the same roles
+        // and from here on owns the list. A site that already has a value
+        // keeps it.
+        plagiarism_pchkorg_roles::store_default_setting();
+
+        upgrade_plugin_savepoint(true, 2026101900, 'plagiarism', 'pchkorg');
+    }
+
     return true;
 }
