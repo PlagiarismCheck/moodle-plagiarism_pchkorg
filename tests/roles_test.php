@@ -140,12 +140,16 @@ class roles_test extends \advanced_testcase {
     /**
      * The case this setting exists for: a Tutor role allowed to view results
      * but not moodle/grade:viewall is a student until the site lists it.
+     *
+     * The defaults include tutor, so the test starts from a list without it.
      */
     public function test_a_listed_custom_role_is_treated_as_a_teacher(): void {
         $tutor = $this->user_with_custom_role('tutor');
         $context = \context_course::instance($this->course->id);
 
-        $this->assertFalse(\plagiarism_pchkorg_roles::is_teacher($context, $tutor->id), 'not listed by default');
+        $this->set_setting('ta');
+
+        $this->assertFalse(\plagiarism_pchkorg_roles::is_teacher($context, $tutor->id), 'not listed');
         $this->assertTrue(\plagiarism_pchkorg_roles::is_student($context, $tutor->id));
 
         $this->set_setting("ta\ntutor");
