@@ -12,7 +12,7 @@
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="false" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="state" TYPE="int" LENGTH="3" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="score" TYPE="float" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-        <FIELD NAME="scoreai" TYPE="number" LENGTH="4" NOTNULL="false" SEQUENCE="false" DECIMALS="2"/>
+        <FIELD NAME="scoreai" TYPE="number" LENGTH="5" NOTNULL="false" SEQUENCE="false" DECIMALS="2"/>
         <FIELD NAME="created_at" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="textid" TYPE="int" LENGTH="11" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="reportid" TYPE="int" LENGTH="11" NOTNULL="false" SEQUENCE="false"/>
@@ -20,12 +20,16 @@
         <FIELD NAME="attempt" TYPE="int" LENGTH="5" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="itemid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="message" TYPE="char" LENGTH="130" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="polled_at" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When update_reports last asked the service about this record, 0 if never"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
         <KEY NAME="cm" TYPE="foreign" FIELDS="cm" REFTABLE="course_modules" REFFIELDS="id"/>
         <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
       </KEYS>
+      <INDEXES>
+        <INDEX NAME="state_polled" UNIQUE="false" FIELDS="state, polled_at"/>
+      </INDEXES>
     </TABLE>
     <TABLE NAME="plagiarism_pchkorg_config" COMMENT="config for modules">
       <FIELDS>

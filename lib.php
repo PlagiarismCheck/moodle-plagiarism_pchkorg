@@ -498,6 +498,24 @@ class plagiarism_plugin_pchkorg extends plagiarism_plugin {
     const MESSAGE_MAX_LENGTH = 130;
 
     /**
+     * Most sent records one run of update_reports looks at.
+     */
+    const POLL_BATCH_SIZE = 100;
+
+    /**
+     * Seconds after which a run of update_reports stops polling.
+     *
+     * The task runs every minute. Leaving headroom keeps a slow service from
+     * making each run overlap the next.
+     */
+    const POLL_TIME_BUDGET = 45;
+
+    /**
+     * Stored on a record whose text the service no longer has.
+     */
+    const NOT_FOUND_MESSAGE = 'Text not found on PlagiarismCheck.org (HTTP 404)';
+
+    /**
      * Fit a message into plagiarism_pchkorg_files.message.
      *
      * Uses core_text so a multibyte message is never cut mid-character, which
@@ -864,6 +882,29 @@ display: inline-block;"
             href="#" class="plagiarism_pchkorg_report_id_score">
                 <img src="' . $imgsrc . '" alt="logo" width="20" />
                 ' . $label . '
+            </span>';
+            } else if (
+                $filerecord->state == plagiarism_pchkorg_state::LOCAL_ERROR
+                && !empty($filerecord->textid)
+            ) {
+                // The text reached the service and could not be checked there.
+                // Failures before sending stay hidden: their messages can name
+                // users, and the submission may still be retried.
+                $label = sprintf(get_string('pchkorg_label_failed', 'plagiarism_pchkorg'), $filerecord->textid);
+                $reason = empty($filerecord->message)
+                    ? get_string('pchkorg_label_failed_reason', 'plagiarism_pchkorg')
+                    : $filerecord->message;
+                return '
+                <span style="padding: 5px 3px;
+text-decoration: none;
+background-color: #eeeded;
+color: black;
+border-radius: 3px 3px 3px 3px;
+margin: 4px;
+display: inline-block;"
+            title="' . s($reason) . '" class="plagiarism_pchkorg_report_id_score plagiarism_pchkorg_failed">
+                <img src="' . $imgsrc . '" alt="logo" width="20" />
+                ' . s($label) . '
             </span>';
             } else {
                 return $this->exit_message(
@@ -1776,17 +1817,30 @@ display: inline-block;"
     /**
      * Method will update similarity score and change status of checks.
      *
+     * Records are polled newest first, then least recently polled. A fresh
+     * submission gets its result within a minute however long the backlog,
+     * and a text that never resolves cannot hold a slot for ever: every poll,
+     * answered or not, stamps polled_at and sends the record to the back.
+     *
      * @param plagiarism_pchkorg_api_provider|null $apiprovider Injected by tests; built from config otherwise.
+     * @param progress_trace|null $trace Where the run is reported; silent when omitted.
+     * @param int|null $timebudget Seconds before the run stops polling; POLL_TIME_BUDGET when omitted.
      * @return bool
      * @throws dml_exception
      */
-    public function cron_update_reports($apiprovider = null) {
+    public function cron_update_reports($apiprovider = null, $trace = null, $timebudget = null) {
         global $DB;
 
         $pchkorgconfigmodel = new plagiarism_pchkorg_config_model();
         if (null === $apiprovider) {
             $apitoken = $pchkorgconfigmodel->get_system_config('pchkorg_token');
             $apiprovider = new plagiarism_pchkorg_api_provider($apitoken);
+        }
+        if (null === $trace) {
+            $trace = new null_progress_trace();
+        }
+        if (null === $timebudget) {
+            $timebudget = self::POLL_TIME_BUDGET;
         }
 
         // SQL will be called only once, result is static.
@@ -1795,40 +1849,169 @@ display: inline-block;"
             return true;
         }
 
-        $filesconditions = ['state' => plagiarism_pchkorg_state::LOCAL_SENT];
-
         $moodlefiles = $DB->get_records(
             'plagiarism_pchkorg_files',
-            $filesconditions,
-            'id',
+            ['state' => plagiarism_pchkorg_state::LOCAL_SENT],
+            'polled_at ASC, id DESC',
             '*',
             0,
-            20
+            self::POLL_BATCH_SIZE
         );
 
-        foreach ($moodlefiles as $filedb) {
-            $report = $apiprovider->check_text($filedb->textid);
-            if ($report !== null) {
-                $filedbnew = new stdClass();
-                $filedbnew->id = $filedb->id;
-                $filedbnew->reportid = $report->id;
-                // successful check, all good.
-                if (plagiarism_pchkorg_state::REMOTE_CHECKED === $report->state) {
-                    $filedbnew->state = plagiarism_pchkorg_state::LOCAL_CHECKED;
-                    // The score column is NOT NULL, so fall back to 0 when the service
-                    // reports a checked text without a similarity percentage. scoreai is
-                    // nullable and stays null when AI detection did not run.
-                    $filedbnew->score = null === $report->percent ? 0 : $report->percent;
-                    $filedbnew->scoreai = $report->percent_ai;
-                } else {
-                    // Check has been failed for some reason. We cannot check this document.
-                    // We can mark this queue-item as failed and move to the next document.
-                    // LOCAL_ERROR will fail document in queue and hide it from the UI.
-                    $filedbnew->state = plagiarism_pchkorg_state::LOCAL_ERROR;
-                }
+        $started = microtime(true);
+        $counts = ['polled' => 0, 'checked' => 0, 'failed' => 0, 'pending' => 0, 'unresolved' => 0];
+        // Set once the service has answered any text in JSON, which proves the
+        // token works and so that an HTML 404 in the same run is about the text.
+        $tokenworks = false;
+        $unconfirmed = [];
 
-                $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+        foreach ($moodlefiles as $filedb) {
+            if ($counts['polled'] > 0 && microtime(true) - $started >= $timebudget) {
+                break;
             }
+            $counts['polled']++;
+            $now = time();
+
+            try {
+                $poll = $apiprovider->poll_text($filedb->textid);
+            } catch (\Throwable $e) {
+                $trace->output(sprintf('Text %s: poll failed: %s', $filedb->textid, $e->getMessage()));
+                $this->mark_polled($filedb, $now, $trace);
+                $counts['unresolved']++;
+                continue;
+            }
+
+            if (plagiarism_pchkorg_api_provider::POLL_FINAL === $poll->outcome) {
+                $tokenworks = true;
+                $message = plagiarism_pchkorg_state::REMOTE_ERASED === $poll->report->state
+                    ? 'Text was deleted on PlagiarismCheck.org'
+                    : sprintf('PlagiarismCheck.org could not check this text (state %d)', $poll->report->state);
+                $stored = $this->resolve_polled_record($filedb, $poll->report, $message, $now, $trace);
+                $counts[null === $stored ? 'unresolved' : $stored]++;
+            } else if (plagiarism_pchkorg_api_provider::POLL_PENDING === $poll->outcome) {
+                $tokenworks = true;
+                $this->mark_polled($filedb, $now, $trace);
+                $counts['pending']++;
+            } else if (plagiarism_pchkorg_api_provider::POLL_NOT_FOUND === $poll->outcome) {
+                $stored = $this->resolve_polled_record($filedb, null, self::NOT_FOUND_MESSAGE, $now, $trace);
+                $counts[null === $stored ? 'unresolved' : $stored]++;
+            } else if (plagiarism_pchkorg_api_provider::POLL_NOT_FOUND_UNCONFIRMED === $poll->outcome) {
+                // Decided after the loop, once the run knows whether the token works.
+                $this->mark_polled($filedb, $now, $trace);
+                $unconfirmed[] = $filedb;
+            } else if (plagiarism_pchkorg_api_provider::POLL_TOKEN_REJECTED === $poll->outcome) {
+                $this->mark_polled($filedb, $now, $trace);
+                $counts['unresolved']++;
+                $trace->output('PlagiarismCheck.org refused the API token (HTTP 401); stopping this run');
+                break;
+            } else {
+                $trace->output(sprintf('Text %s: no usable answer (HTTP %d)', $filedb->textid, $poll->status));
+                $this->mark_polled($filedb, $now, $trace);
+                $counts['unresolved']++;
+            }
+        }
+
+        foreach ($unconfirmed as $filedb) {
+            if (!$tokenworks) {
+                $trace->output(sprintf(
+                    'Text %s: HTTP 404, left as sent until another text proves the token works',
+                    $filedb->textid
+                ));
+                $counts['unresolved']++;
+                continue;
+            }
+            $stored = $this->resolve_polled_record($filedb, null, self::NOT_FOUND_MESSAGE, time(), $trace);
+            $counts[null === $stored ? 'unresolved' : $stored]++;
+        }
+
+        $trace->output(sprintf(
+            'Polled %d of %d sent records in %.1fs: %d checked, %d failed, %d still processing, %d unresolved',
+            $counts['polled'],
+            count($moodlefiles),
+            microtime(true) - $started,
+            $counts['checked'],
+            $counts['failed'],
+            $counts['pending'],
+            $counts['unresolved']
+        ));
+
+        return true;
+    }
+
+    /**
+     * Store the final outcome of a poll.
+     *
+     * A record that already holds a report, put back to LOCAL_SENT by a
+     * refresh, is never downgraded: when its text can no longer be read it
+     * returns to LOCAL_CHECKED with the scores it had.
+     *
+     * A write that fails is reported rather than thrown, so one bad record
+     * cannot stop the run, and the record is still sent to the back.
+     *
+     * @param stdClass $filedb
+     * @param stdClass|null $report Final report from the service, null when the text is gone.
+     * @param string $message Stored when the record fails.
+     * @param int $now
+     * @param progress_trace $trace
+     * @return string|null 'checked' or 'failed' as stored, null when the write failed.
+     */
+    private function resolve_polled_record($filedb, $report, $message, $now, $trace) {
+        global $DB;
+
+        $filedbnew = new stdClass();
+        $filedbnew->id = $filedb->id;
+        $filedbnew->polled_at = $now;
+
+        if (null !== $report && plagiarism_pchkorg_state::REMOTE_CHECKED === $report->state) {
+            $filedbnew->reportid = $report->id;
+            $filedbnew->state = plagiarism_pchkorg_state::LOCAL_CHECKED;
+            // The score column is NOT NULL, so fall back to 0 when the service
+            // reports a checked text without a similarity percentage. scoreai is
+            // nullable and stays null when AI detection did not run.
+            $filedbnew->score = null === $report->percent ? 0 : $report->percent;
+            $filedbnew->scoreai = $report->percent_ai;
+            $stored = 'checked';
+        } else if (!empty($filedb->reportid)) {
+            $filedbnew->state = plagiarism_pchkorg_state::LOCAL_CHECKED;
+            $trace->output(sprintf('Text %s: %s; keeping the earlier result', $filedb->textid, $message));
+            $stored = 'checked';
+        } else {
+            // LOCAL_ERROR ends the record's life in the queue. The widget shows
+            // it as a failed check, with the message as the reason.
+            $filedbnew->state = plagiarism_pchkorg_state::LOCAL_ERROR;
+            $filedbnew->message = self::truncate_message($message);
+            if (null !== $report) {
+                $filedbnew->reportid = $report->id;
+            }
+            $stored = 'failed';
+        }
+
+        try {
+            $DB->update_record('plagiarism_pchkorg_files', $filedbnew);
+        } catch (\Throwable $e) {
+            $trace->output(sprintf('Text %s: could not store the result: %s', $filedb->textid, $e->getMessage()));
+            $this->mark_polled($filedb, $now, $trace);
+            return null;
+        }
+
+        return $stored;
+    }
+
+    /**
+     * Stamp a record as polled, which sends it to the back of the queue.
+     *
+     * @param stdClass $filedb
+     * @param int $now
+     * @param progress_trace $trace
+     * @return void
+     */
+    private function mark_polled($filedb, $now, $trace) {
+        global $DB;
+
+        try {
+            $DB->set_field('plagiarism_pchkorg_files', 'polled_at', $now, ['id' => $filedb->id]);
+        } catch (\Throwable $e) {
+            $trace->output(sprintf('Text %s: could not stamp the poll: %s', $filedb->textid, $e->getMessage()));
         }
     }
 }

@@ -55,4 +55,12 @@ interface plagiarism_pchkorg_transport {
      * @return string|bool Response body, or false on failure.
      */
     public function get($url, $params = [], $options = []);
+
+    /**
+     * HTTP status of the most recent request.
+     *
+     * @return int The status code, or 0 when no HTTP response arrived at all
+     *             (timeout, refused connection, DNS failure).
+     */
+    public function last_http_status();
 }

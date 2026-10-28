@@ -178,5 +178,31 @@ function xmldb_plagiarism_pchkorg_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026101900, 'plagiarism', 'pchkorg');
     }
 
+    if ($oldversion < 2026102800) {
+        $table = new xmldb_table('plagiarism_pchkorg_files');
+
+        // An AI score of 100 did not fit number(4,2), and the write aborted the
+        // whole update_reports run on every later attempt.
+        $field = new xmldb_field('scoreai', XMLDB_TYPE_NUMBER, '5, 2', null, null, null, null, 'score');
+        if ($dbman->field_exists($table, $field)) {
+            $dbman->change_field_precision($table, $field);
+        }
+
+        // The update_reports task polls least recently polled first, so texts that never
+        // resolve cannot hold every slot. Existing rows start at 0, so the
+        // first runs after the upgrade work through the backlog newest first.
+        $field = new xmldb_field('polled_at', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'message');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $index = new xmldb_index('state_polled', XMLDB_INDEX_NOTUNIQUE, ['state', 'polled_at']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102800, 'plagiarism', 'pchkorg');
+    }
+
     return true;
 }

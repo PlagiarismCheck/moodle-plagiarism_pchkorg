@@ -34,8 +34,14 @@ require_once(__DIR__ . '/../../classes/transport.php');
  * Moodle range spans PHPUnit 7 to 11, whose mocking APIs are not compatible.
  */
 class plagiarism_pchkorg_fake_transport implements plagiarism_pchkorg_transport {
-    /** @var array Queued response bodies, returned in order. */
+    /** @var array Queued responses, returned in order. */
     private $responses = [];
+
+    /** @var callable|null Answers by request instead of by order, when set. */
+    private $responder = null;
+
+    /** @var int Status of the most recent response. */
+    private $lasthttpstatus = 0;
 
     /** @var array Every request made, in order. */
     private $requests = [];
@@ -43,10 +49,17 @@ class plagiarism_pchkorg_fake_transport implements plagiarism_pchkorg_transport 
     /**
      * Construct.
      *
-     * @param array $responses Response bodies to return, one per call.
+     * A response is either a body string, answered with status 200, or
+     * ['status' => int, 'body' => string]. Once the queue runs dry every call
+     * answers with an empty body and status 0, as an unreachable service would.
+     *
+     * @param array $responses Responses to return, one per call.
+     * @param callable|null $responder fn(string $method, string $url, $params): response,
+     *                                 used instead of the queue when given.
      */
-    public function __construct(array $responses = []) {
+    public function __construct(array $responses = [], $responder = null) {
         $this->responses = $responses;
+        $this->responder = $responder;
     }
 
     /**
@@ -90,11 +103,30 @@ class plagiarism_pchkorg_fake_transport implements plagiarism_pchkorg_transport 
             'options' => $options,
         ];
 
-        if (empty($this->responses)) {
-            return '';
+        if (null !== $this->responder) {
+            $response = call_user_func($this->responder, $method, $url, $params);
+        } else if (empty($this->responses)) {
+            $response = ['status' => 0, 'body' => ''];
+        } else {
+            $response = array_shift($this->responses);
         }
 
-        return array_shift($this->responses);
+        if (is_array($response)) {
+            $this->lasthttpstatus = $response['status'];
+            return $response['body'];
+        }
+
+        $this->lasthttpstatus = 200;
+        return $response;
+    }
+
+    /**
+     * Status of the most recent response.
+     *
+     * @return int
+     */
+    public function last_http_status() {
+        return $this->lasthttpstatus;
     }
 
     /**

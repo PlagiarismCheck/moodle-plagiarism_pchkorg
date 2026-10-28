@@ -2,6 +2,41 @@
 
 All notable changes to `plagiarism_pchkorg`, most recent first.
 
+## v3.21.3 — 28 October 2026
+
+- **Results no longer get stuck at "Sent".** The "Update check result" task
+  used to ask about the same 20 oldest submissions on every run. A text the
+  service no longer had answered with a 404, which the task took for "still
+  processing", so 20 such texts blocked every result behind them, and the
+  task still looked healthy.
+- The task now asks about the newest submissions first, then the ones it asked
+  about longest ago. A new result arrives within a minute however long the
+  backlog, and a text that never resolves goes to the back instead of holding
+  its place.
+- A text the service reports as missing or deleted now ends as a failed check
+  with the reason stored, instead of being asked about for ever. A submission
+  that already had a result, and was queued again by "Refresh results", keeps
+  that result.
+- A 404 is trusted only when the service answers it in JSON, or when another
+  text in the same run proved the token works. An older service also sent a
+  404 for an unknown or disabled group token, and that must not fail every
+  submission on the site. A refused token (401) stops the run.
+- Teachers and students now see "Check failed" with the reason on a text that
+  reached PlagiarismCheck.org and could not be checked. Failures before a text
+  was sent stay hidden, as before.
+- Each run works for up to 45 seconds and up to 100 submissions, instead of a
+  fixed 20, so a backlog clears in hours rather than days.
+- The task now writes a summary of every run to the task log, plus a line for
+  each text that got no usable answer, with its HTTP status.
+- An AI score of 100 is now stored. It did not fit the column, and the failed
+  write stopped the whole run on every supported database, on every later run
+  too. Sites with a personal token were affected; the service already sent
+  group-token sites 99.99 instead. The column now holds any score the service
+  can send, in any format. A submission whose result cannot be stored no
+  longer stops the run either.
+- The upgrade adds a `polled_at` column. Submissions already waiting start at
+  0, so the first runs after the upgrade work through them newest first.
+
 ## v3.21.2 — 19 October 2026
 
 - **The custom teaching roles are now a site setting.** "Custom teaching roles"

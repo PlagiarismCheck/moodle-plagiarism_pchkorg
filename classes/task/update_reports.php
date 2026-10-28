@@ -52,6 +52,8 @@ class update_reports extends \core\task\scheduled_task {
         require_once($CFG->dirroot . '/plagiarism/pchkorg/lib.php');
 
         $plugin = new \plagiarism_plugin_pchkorg();
-        $plugin->cron_update_reports();
+        // The trace lands in the task log, where admins can see texts that
+        // never resolve instead of a run that silently looks healthy.
+        $plugin->cron_update_reports(null, new \text_progress_trace());
     }
 }

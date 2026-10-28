@@ -107,6 +107,51 @@ class report_link_test extends \advanced_testcase {
     }
 
     /**
+     * A text the service could not check is shown as a failed check, with the
+     * stored reason, instead of disappearing from the page.
+     */
+    public function test_failed_check_after_sending_is_shown(): void {
+        $this->resetAfterTest(true);
+        $data = $this->setup_submission([], [
+            'state' => \plagiarism_pchkorg_state::LOCAL_ERROR,
+            'reportid' => null,
+            'message' => \plagiarism_plugin_pchkorg::NOT_FOUND_MESSAGE,
+        ]);
+
+        foreach ([$data->teacher, $data->student] as $user) {
+            $this->setUser($user);
+            $output = $this->render($data);
+
+            $this->assertStringContainsString('ID: 9999 Check failed', $output);
+            $this->assertStringContainsString(
+                'title="' . s(\plagiarism_plugin_pchkorg::NOT_FOUND_MESSAGE) . '"',
+                $output
+            );
+            $this->assertStringNotContainsString('report.php', $output);
+        }
+    }
+
+    /**
+     * A failure before the text was sent stays hidden, as before: its
+     * message can name a user.
+     */
+    public function test_failure_before_sending_stays_hidden(): void {
+        $this->resetAfterTest(true);
+        $data = $this->setup_submission([], [
+            'state' => \plagiarism_pchkorg_state::LOCAL_ERROR,
+            'textid' => null,
+            'reportid' => null,
+            'message' => 'User someone@example.com is not a member of group',
+        ]);
+
+        $this->setUser($data->teacher);
+        $output = $this->render($data);
+
+        $this->assertStringNotContainsString('Check failed', $output);
+        $this->assertStringNotContainsString('someone@example.com', $output);
+    }
+
+    /**
      * The case Custom teaching roles exists for: a Tutor role allowed to view
      * results, but not moodle/grade:viewall, sees the score and the report
      * link on another student's work once listed, even where students may see
@@ -144,9 +189,10 @@ class report_link_test extends \advanced_testcase {
      * configuration, and one checked submission belonging to the student.
      *
      * @param array $moduleconfig Extra per-activity settings.
+     * @param array $overrides Fields overriding the submission record's defaults.
      * @return \stdClass
      */
-    private function setup_submission(array $moduleconfig = []) {
+    private function setup_submission(array $moduleconfig = [], array $overrides = []) {
         global $DB;
 
         $generator = $this->getDataGenerator();
@@ -190,6 +236,9 @@ class report_link_test extends \advanced_testcase {
         $filerecord->attempt = 0;
         $filerecord->reportid = 4321;
         $filerecord->created_at = time();
+        foreach ($overrides as $name => $value) {
+            $filerecord->$name = $value;
+        }
         $DB->insert_record('plagiarism_pchkorg_files', $filerecord);
 
         // Creating the course module runs plugin hooks which read and therefore

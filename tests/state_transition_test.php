@@ -112,6 +112,14 @@ class state_transition_test extends \advanced_testcase {
                 $record->state,
                 $label
             );
+            // The widget shows this reason on the failed check.
+            $this->assertSame(
+                \plagiarism_pchkorg_state::REMOTE_ERASED === $remotestate
+                    ? 'Text was deleted on PlagiarismCheck.org'
+                    : sprintf('PlagiarismCheck.org could not check this text (state %d)', $remotestate),
+                $record->message,
+                $label
+            );
         }
     }
 

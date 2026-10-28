@@ -31,6 +31,9 @@ require_once(__DIR__ . '/transport.php');
  * Default transport: Moodle's curl wrapper.
  */
 class plagiarism_pchkorg_curl_transport implements plagiarism_pchkorg_transport {
+    /** @var int HTTP status of the most recent request, 0 when none arrived. */
+    private $lasthttpstatus = 0;
+
     /**
      * Perform an HTTP POST.
      *
@@ -41,8 +44,10 @@ class plagiarism_pchkorg_curl_transport implements plagiarism_pchkorg_transport 
      */
     public function post($url, $params = '', $options = []) {
         $curl = new curl();
+        $response = $curl->post($url, $params, $options);
+        $this->remember_status($curl);
 
-        return $curl->post($url, $params, $options);
+        return $response;
     }
 
     /**
@@ -55,7 +60,34 @@ class plagiarism_pchkorg_curl_transport implements plagiarism_pchkorg_transport 
      */
     public function get($url, $params = [], $options = []) {
         $curl = new curl();
+        $response = $curl->get($url, $params, $options);
+        $this->remember_status($curl);
 
-        return $curl->get($url, $params, $options);
+        return $response;
+    }
+
+    /**
+     * HTTP status of the most recent request.
+     *
+     * @return int
+     */
+    public function last_http_status() {
+        return $this->lasthttpstatus;
+    }
+
+    /**
+     * Keep the status of the request just made.
+     *
+     * On a transport error Moodle's curl returns its error text in place of a
+     * body and the reported status is 0 or stale, so that case is pinned to 0.
+     *
+     * @param curl $curl
+     * @return void
+     */
+    private function remember_status($curl) {
+        $info = $curl->get_info();
+        $this->lasthttpstatus = 0 === (int) $curl->get_errno() && isset($info['http_code'])
+            ? (int) $info['http_code']
+            : 0;
     }
 }

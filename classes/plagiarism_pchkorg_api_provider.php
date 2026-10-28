@@ -34,6 +34,24 @@ require_once(__DIR__ . '/group_info.php');
  * Class provider HTTP-API methods.
  */
 class plagiarism_pchkorg_api_provider {
+    /** @var string Poll outcome: the text reached a final state; report holds it. */
+    const POLL_FINAL = 'final';
+
+    /** @var string Poll outcome: the service is still working on the text. */
+    const POLL_PENDING = 'pending';
+
+    /** @var string Poll outcome: the service says, in JSON, that the text does not exist. */
+    const POLL_NOT_FOUND = 'not_found';
+
+    /** @var string Poll outcome: an HTML 404, which an older service also sent for a bad token. */
+    const POLL_NOT_FOUND_UNCONFIRMED = 'not_found_unconfirmed';
+
+    /** @var string Poll outcome: the service refused the token itself. */
+    const POLL_TOKEN_REJECTED = 'token_rejected';
+
+    /** @var string Poll outcome: nothing usable came back (5xx, 403, timeout, not JSON). */
+    const POLL_UNRESOLVED = 'unresolved';
+
     /**
      * Auth token.
      *
@@ -797,101 +815,120 @@ class plagiarism_pchkorg_api_provider {
      * If document has been checked, state is 5.
      *
      * @param $textid
-     * @return object|null
+     * @return object|null The final report (checked or failed), or null while
+     *                     the text has no final state or cannot be read.
      */
     public function check_text($textid) {
-        if ($this->is_group_token()) {
-            // The same method but for group users.
-            // It uses different auth.
-            return $this->group_check_text($textid);
-        }
+        $poll = $this->poll_text($textid);
 
-        $response = $this->transport->get($this->endpoint . '/api/v1/text/' . $textid, [], [
-                'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_TIMEOUT' => 30,
-                'CURLOPT_POST' => false,
-                'CURLOPT_HTTPHEADER' => [
-                        'X-API-TOKEN: ' . $this->generate_api_token(),
-                        'Content-Type: application/x-www-form-urlencoded',
-                ],
-        ]);
-
-        if ($json = json_decode($response)) {
-            if (
-                isset($json->data)
-                    && \in_array($json->data->state, plagiarism_pchkorg_state::remote_final_states(), true)
-            ) {
-                // The service returns a null report for texts which were never checked
-                // (failed, dropped, erased), and a null ai_report whenever AI detection
-                // did not run. Neither may be dereferenced unguarded.
-                $result = new stdClass();
-                $result->id = isset($json->data->report->id) ? $json->data->report->id : null;
-                $result->state = $json->data->state;
-                if (plagiarism_pchkorg_state::REMOTE_CHECKED === $json->data->state) {
-                    $result->percent = isset($json->data->report->percent)
-                        ? $json->data->report->percent
-                        : null;
-                    $result->percent_ai = isset($json->data->ai_report->processed_percent)
-                        ? $json->data->ai_report->processed_percent
-                        : null;
-                } else {
-                    $result->percent = null;
-                    $result->percent_ai = null;
-                }
-
-                return $result;
-            }
-        }
-
-        return null;
+        return self::POLL_FINAL === $poll->outcome ? $poll->report : null;
     }
 
     /**
-     * Check status of document for Group User
-     * If document has been checked, state is 5.
+     * Ask the service where a sent text stands.
      *
-     * @param $textid
-     * @return object|null
+     * Unlike check_text() this tells the cases apart that the poll must treat
+     * differently: a text that is gone for good, a token the service refuses,
+     * and a response that says nothing either way.
+     *
+     * @param int $textid
+     * @return stdClass With outcome (one of the POLL_* constants), status (the
+     *                  HTTP status, 0 when none arrived) and report (the final
+     *                  report when outcome is POLL_FINAL, null otherwise).
      */
-    public function group_check_text($textid) {
-        $response = $this->transport->get("{$this->endpoint}/lms/check-report/{$textid}/", [
-                'token' => $this->token,
-        ], [
-                'CURLOPT_RETURNTRANSFER' => true,
-                'CURLOPT_TIMEOUT' => 30,
-                'CURLOPT_POST' => false,
-                'CURLOPT_HTTPHEADER' => [
-                        'Content-Type: application/x-www-form-urlencoded',
-                ],
-        ]);
-        if ($json = json_decode($response)) {
-            if (
-                isset($json->data)
-                    && \in_array($json->data->state, plagiarism_pchkorg_state::remote_final_states(), true)
-            ) {
-                // The service returns a null report for texts which were never checked
-                // (failed, dropped, erased), and a null ai_report whenever AI detection
-                // did not run. Neither may be dereferenced unguarded.
-                $result = new stdClass();
-                $result->id = isset($json->data->report->id) ? $json->data->report->id : null;
-                $result->state = $json->data->state;
-                if (plagiarism_pchkorg_state::REMOTE_CHECKED === $json->data->state) {
-                    $result->percent = isset($json->data->report->percent)
-                        ? $json->data->report->percent
-                        : null;
-                    $result->percent_ai = isset($json->data->ai_report->processed_percent)
-                        ? $json->data->ai_report->processed_percent
-                        : null;
-                } else {
-                    $result->percent = null;
-                    $result->percent_ai = null;
-                }
-
-                return $result;
-            }
+    public function poll_text($textid) {
+        if ($this->is_group_token()) {
+            // Group users poll a different endpoint with different auth.
+            $response = $this->transport->get("{$this->endpoint}/lms/check-report/{$textid}/", [
+                    'token' => $this->token,
+            ], [
+                    'CURLOPT_RETURNTRANSFER' => true,
+                    'CURLOPT_TIMEOUT' => 30,
+                    'CURLOPT_POST' => false,
+                    'CURLOPT_HTTPHEADER' => [
+                            'Content-Type: application/x-www-form-urlencoded',
+                    ],
+            ]);
+        } else {
+            $response = $this->transport->get($this->endpoint . '/api/v1/text/' . $textid, [], [
+                    'CURLOPT_RETURNTRANSFER' => true,
+                    'CURLOPT_TIMEOUT' => 30,
+                    'CURLOPT_POST' => false,
+                    'CURLOPT_HTTPHEADER' => [
+                            'X-API-TOKEN: ' . $this->generate_api_token(),
+                            'Content-Type: application/x-www-form-urlencoded',
+                    ],
+            ]);
         }
 
-        return null;
+        return self::parse_poll_response((int) $this->transport->last_http_status(), $response);
+    }
+
+    /**
+     * Classify one status response.
+     *
+     * @param int $status HTTP status, 0 when no response arrived.
+     * @param string|bool $response Response body.
+     * @return stdClass See poll_text().
+     */
+    private static function parse_poll_response($status, $response) {
+        $result = new stdClass();
+        $result->outcome = self::POLL_UNRESOLVED;
+        $result->status = $status;
+        $result->report = null;
+
+        $json = is_string($response) ? json_decode($response) : null;
+
+        if (404 === $status) {
+            // The service answers a missing text in JSON. A 404 page in HTML
+            // comes from an older service, which also answered an unknown group
+            // token that way, so on its own it does not prove the text is gone.
+            $result->outcome = is_object($json) ? self::POLL_NOT_FOUND : self::POLL_NOT_FOUND_UNCONFIRMED;
+            return $result;
+        }
+
+        if (401 === $status) {
+            $result->outcome = self::POLL_TOKEN_REJECTED;
+            return $result;
+        }
+
+        if (
+            200 !== $status
+                || !is_object($json)
+                || !isset($json->data)
+                || !is_object($json->data)
+                || !isset($json->data->state)
+        ) {
+            return $result;
+        }
+
+        if (!\in_array($json->data->state, plagiarism_pchkorg_state::remote_final_states(), true)) {
+            $result->outcome = self::POLL_PENDING;
+            return $result;
+        }
+
+        // The service returns a null report for texts which were never checked
+        // (failed, dropped, erased), and a null ai_report whenever AI detection
+        // did not run. Neither may be dereferenced unguarded.
+        $report = new stdClass();
+        $report->id = isset($json->data->report->id) ? $json->data->report->id : null;
+        $report->state = $json->data->state;
+        if (plagiarism_pchkorg_state::REMOTE_CHECKED === $json->data->state) {
+            $report->percent = isset($json->data->report->percent)
+                ? $json->data->report->percent
+                : null;
+            $report->percent_ai = isset($json->data->ai_report->processed_percent)
+                ? $json->data->ai_report->processed_percent
+                : null;
+        } else {
+            $report->percent = null;
+            $report->percent_ai = null;
+        }
+
+        $result->outcome = self::POLL_FINAL;
+        $result->report = $report;
+
+        return $result;
     }
 
     /**
